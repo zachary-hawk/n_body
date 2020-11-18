@@ -79,5 +79,5 @@ clean_all:
 	rm -f -r $(BUILD_DIR)/*/ 
 
 dist:
-	tar  --exclude="./.git" --exclude="./Test" --exclude="./*/*.mpi" --exclude="./*/*.serial" --exclude="./Source/*.o" --exclude="./Source/*.mod" -cvf MC_POP.tar .
+	tar  --exclude="./.git" --exclude="./Test" --exclude="./*/*.mpi" --exclude="./*/*.serial" --exclude="./Source/*.o" --exclude="./Source/*.mod" -cvf N_BODY.tar .
 

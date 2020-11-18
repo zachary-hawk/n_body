@@ -9,13 +9,15 @@ module io
 
 
   logical,           public                :: no_param,read_params=.true.
-  character(len=128),public                :: version  = "MC_POP v.1.0, Z. Hawkhead"
-  character(len=128),public                :: info     = "Parallel code for Monte Carlo Population simulation"
+  character(len=128),public                :: version  = "N_BODY v.1.0, Z. Hawkhead"
+  character(len=128),public                :: info     = "Parallel code for n-body gravitational simulations."
   integer,           public,parameter      :: stdout = 984 
   integer,           public,parameter      :: dp = real64
-  integer                                  :: demo_unit
-  real,              public,parameter      :: pi=3.1415926535
+  real,              public,parameter      :: pi=3.1415926535_dp
+  real(dp),          public,parameter      :: G= 6.67430E-11
   logical,           public                :: file_exists
+  logical,           public                :: file_exists_struct
+  
   character(100),dimension(:),allocatable  :: present_array
 
   character(100),dimension(:),allocatable  :: keys_array
@@ -24,106 +26,42 @@ module io
   character(100),dimension(:),allocatable  :: keys_allowed
   character(100),dimension(:),allocatable  :: keys_type
 
-  real(dp),    dimension(0:100),public      :: demo_init_men
-  real(dp),    dimension(0:100),public      :: demo_init_women
-
+  
   integer                                  :: max_params=1
 
   type  parameters
      ! Begin: parameters
-     
+
      !Calculation parameters
-     integer          :: init_pop          = 10000
-     real(dp)         :: child_age         = 23.0
-     integer          :: calc_len          = 100
-     integer          :: life_table_year   = 2017
-     !Child prob params
-     real(dp)         :: child_sd          = 5.0_dp
-     real(dp)         :: child_norm        = 2.2_dp!0.4_dp
+     real(dp)         :: calc_len          = 100.0
+     real(dp)         :: time_step         = 0.5
 
-
-     !Some extra functionality
+     logical          :: debuging         = .false.
      logical          :: dry_run           = .false.
-     logical          :: debuging          = .false.
-     integer          :: redistrib_freq    = 10
-
-     logical          :: init_demo         = .false.
-     integer          :: random_seed
-
-     !I/O parameters
-     logical          :: write_population  = .true.
-     logical          :: write_ave_age     = .false.
-     logical          :: write_birth_rate  = .false.
-     logical          :: write_demo        = .false.
-     ! Disease parameters
-     real(dp)         :: disease_spread    = 0.1
-     real(dp)         :: disease_mort      = 0.02
-     real(dp)         :: disease_init      = 0.01
-     real(dp)         :: disease_crit      = 0.5
-     logical          :: disease           = .false.
+     
      ! End: parameters
   end type parameters
 
   ! Begin: keys
-  character(len=30),parameter,public :: key_init_pop         = "initial_population"
-  character(len=30),parameter,public :: key_mean_child_age   = "birth_age"
-  character(len=30),parameter,public :: key_calc_len         = "duration"
-  character(len=30),parameter,public :: key_life_table_year  = "life_table_year"
-
-  character(len=30),parameter,public :: key_child_norm       = "birth_rate"
-  character(len=30),parameter,public :: key_child_sd         = "birth_std"
+  character(len=30),parameter,public :: key_calc_len         = "calculation_length"
+  character(len=30),parameter,public :: key_time_step        = "time_step"
   character(len=30),parameter,public :: key_debug            = "debug"
-  character(len=30),parameter,public :: key_redistrib_freq   = "redistrib_freq"
-
-  character(len=30),parameter,public :: key_write_pop        = "write_pop"
-  character(len=30),parameter,public :: key_write_br         = "write_birth_rate"
-  character(len=30),parameter,public :: key_write_age        = "write_ave_age"
-  character(len=30),parameter,public :: key_write_demo       = "write_demographics"
-  character(len=30),parameter,public :: key_init_demo        = "init_demographics"
+  character(len=30),parameter,public :: key_dry_run            = "dryrun"
   
-  character(len=30),parameter,public :: key_random_seed      = "random_seed"
 
-  character(len=30),parameter,public :: key_disease_spread   = "disease_spread"
-  character(len=30),parameter,public :: key_disease_mort     = "disease_mortality"
-  character(len=30),parameter,public :: key_disease_init     = "disease_init_pop"
-  character(len=30),parameter,public :: key_disease_crit     = "disease_critical_mass"
-  character(len=30),parameter,public :: key_disease          = "disease"
   ! End: keys
 
-  type life_table
-     real(dp),dimension(0:100)  :: life_data
-     integer                    :: year
-     character(100)             :: web         ="https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Publications/NVSR/"
-  end type life_table
-
-
+  
   type results
      real(dp)  :: birth_rate
-     real(dp)  :: teen_preg
-     real(dp)  :: ave_age
-     real(dp)  :: infant_mort
-     real(dp)  :: lt_5=0_dp
-     real(dp)  :: i10_20
-     real(dp)  :: i20_30
-     real(dp)  :: i30_40
-     real(dp)  :: i40_50
-     real(dp)  :: i50_65
-     real(dp)  :: i65_plus
-     real(dp)  :: i85_plus
-     real(dp)  :: life_expectancy
-     real(dp)  :: men_pc
+  
   end type results
 
 
   type(parameters),public,save             :: current_params
 
-  type(life_table),public,save             :: current_lifetable_m
-  type(life_table),public,save             :: current_lifetable_f
-  
-
-
   ! No. Parameter keys
-  integer,parameter                        :: max_keys = 19
+  integer,parameter                        :: max_keys = 4
 
 
   !-------------------------------------------------------!
@@ -140,7 +78,7 @@ contains
     !==============================================================================!
     !                          I O _ I N I T I A L I S E                           !
     !==============================================================================!
-    ! Subroutine for initialising all input/output for the parallel code MC_POP    !
+    ! Subroutine for initialising all input/output for the parallel code N_BODY    !
     !------------------------------------------------------------------------------!
     ! Arguments:                                                                   !
     !           None                                                               !
@@ -166,10 +104,10 @@ contains
 
 
     ! Get the length of the parameters file
-    inquire(file="params.pop",exist=file_exists)
+    inquire(file="param.n_body",exist=file_exists)
 
     if (file_exists)then
-       open(unit=1,file="params.pop",iostat=stat,status="OLD",access="stream",form="formatted")
+       open(unit=1,file="param.n_body",iostat=stat,status="OLD",access="stream",form="formatted")
        do while (stat.eq.0)
           read(1,'(A60)',iostat=stat) line
           max_params=max_params+1
@@ -183,84 +121,11 @@ contains
     if (read_params) call io_read_param(current_params)
 
 
-    ! This is where intialise life tables, there will be a datatype in this file
-    call io_read_life(current_lifetable_m,.false.)
-    call io_read_life(current_lifetable_f,.true.)
-
-
-
-    ! Make some sensible defaults
-    if (.not.io_present(key_redistrib_freq))then
-       if (current_params%calc_len.gt.10) then 
-          current_params%redistrib_freq=current_params%calc_len/10
-       else
-          current_params%redistrib_freq=1
-       end if
-    end if
-
-    ! Set Disease
-    if (io_present(key_disease_init)&
-         & .or.io_present(key_disease_mort)&
-         & .or.io_present(key_disease_spread)&
-         & .or.io_present(key_disease_crit)) current_params%disease=.true.
-
-    ! Check for stupidity 
-    if (current_params%calc_len.lt.0) &
-         & call io_errors("Error in I/O: "//trim(key_calc_len)//" must be positive")
-    if (current_params%init_pop.lt.0) &
-         & call io_errors("Error in I/O: "//trim(key_init_pop)//" must be positive")
-!!$    if (current_params%calc_len.lt.current_params%redistrib_freq)&
-!!$         & call io_errors("Error in I/O: "//trim(key_redistrib_freq)//" must be less than or equal to "//trim(key_calc_len)) 
-
-
-    ! Check there are enough people for the number of cores
-    if (current_params%init_pop.gt.0 .and.&
-         & current_params%init_pop.lt.nprocs) &
-         & call io_errors("Error in io_initialise: Too few people, cannot distribute accross requested proccesses")
-    ! Print warning if numbers of people too low on each process
-    if(current_params%init_pop/nprocs.lt.10)&
-         & write(*,*) "Warning: Number of people per proccess is low, consider increasing"
-
+    
     ! Open up the main file for the output
-    open(stdout,file="out.pop",RECL=8192,form="FORMATTED",access="append")
+    open(stdout,file="out.n_body",RECL=8192,form="FORMATTED",access="append")
 
 
-
-    if (current_params%init_demo)then
-       inquire(file="demographics.pop",exist=demo_file)
-
-       if (demo_file)then
-          open(100,file="demographics.pop",status='old',form="UNFORMATTED")
-
-
-          read(100,iostat=stat) demo_length
-
-
-
-          if(stat.ne.0) call io_errors("I/O Error: read error in demographics.pop")
-          do while(stat.eq.0)
-             read(100,iostat=stat) year, age,age_pop
-             if(stat.ne.0)exit
-             demo_init_men(age)=real(age_pop,dp)
-             read(100,iostat=stat)year,age,age_pop
-             demo_init_women(age)=real(age_pop,dp)
-          end do
-          demo_init_men=demo_init_men/sum(demo_init_men)
-          demo_init_women=demo_init_women/sum(demo_init_women)
-          close(100)
-       else
-          call io_errors("I/O Error: No file 'demographics.pop'")
-       end if
-       
-    end if
-    if (current_params%write_demo)then 
-       if (.not.current_params%dry_run)then 
-          ! Open the check file
-          open(newunit=demo_unit,file="demographics.pop",form="UNFORMATTED",status="unknown")
-          ! write the number of years we've got
-          write(demo_unit) 1+current_params%calc_len/current_params%redistrib_freq
-       end if
-    end if
     call io_header()
     call trace_exit("io_initialise")
 
@@ -273,13 +138,13 @@ contains
     !==============================================================================!
     !                          I O _ R E A D _ P A R A M                           !
     !==============================================================================!
-    ! Subroutine for reading parameters from the file "param.pop" to the           !
+    ! Subroutine for reading parameters from the file "param.n_body" to the        !
     ! parameter type current_params                                                !
     !------------------------------------------------------------------------------!
     ! Arguments:                                                                   !
     !           dummy_params,      intent :: inout                                 !
     !------------------------------------------------------------------------------!
-    ! Author:   Z. Hawkhead  19/01/2020                                            !
+    ! Author:   Z. Hawkhead  18/11/2020                                            !
     !==============================================================================!
     implicit none
     !The inout stuff
@@ -300,20 +165,23 @@ contains
 
     !Open the parameter file
     if (file_exists) then
-       open(unit=1,file="params.pop",iostat=stat,status="OLD",access="stream",form="formatted")
+       open(unit=1,file="param.n_body",iostat=stat,status="OLD",access="stream",form="formatted")
 
 
-       if (stat.ne.0) call io_errors("Error in I/O: Open file 'params.pop'")
+       if (stat.ne.0) call io_errors("Error in I/O: Open file 'param.n_body'")
        ! now we can do the reading
+       k=0
        do i=0,max_params
           !first thing, read new line into 'line' variable
-          read(1,'(A60)',iostat=read_stat) line
-          !if (read_stat.ne.0) call io_errors("Error in I/O: Error in read params")
+          read(1,'(A)',iostat=read_stat) line
 
+          write(present_array(i),*)i
+
+          ! Check for blank line
+          if (trim(line).eq."") cycle
 
 
           !Read everying into a thing
-
           call io_freeform_read(line,key,param,comment)
 
           if (comment) cycle ! skip if comment
@@ -322,92 +190,26 @@ contains
           key=adjustl(trim(io_case(key)))
           param=adjustl(trim(io_case(param)))
 
+
           ! Begin: case_read
           select case(key)
-          case(key_init_pop)
-             read(param,*,iostat=stat) real_dump
-             dummy_params%init_pop=int(real_dump)
+          case(key_calc_len)
+             read(param,*,iostat=stat) dummy_params%calc_len
              if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
              present_array(i)=key
-          case(key_mean_child_age) 
-             read(param,*,iostat=stat) dummy_params%child_age
+          case(key_time_step) 
+             read(param,*,iostat=stat) dummy_params%time_step
              if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
              present_array(i)=key
-          case(key_calc_len ) 
-             read(param,*,iostat=stat) real_dump
-             dummy_params%calc_len=int(real_dump)
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_life_table_year) 
-             read(param,*,iostat=stat) dummy_params%life_table_year
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_child_norm)
-             read(param,*,iostat=stat) dummy_params%child_norm
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_child_sd)
-             read(param,*,iostat=stat) dummy_params%child_sd
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_debug)
+          case(key_debug) 
              read(param,*,iostat=stat) dummy_params%debuging
              if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
              present_array(i)=key
-          case(key_write_pop)
-             read(param,*,iostat=stat) dummy_params%write_population
+          case(key_dry_run) 
+             read(param,*,iostat=stat) dummy_params%dry_run
              if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
              present_array(i)=key
-          case(key_write_br)
-             read(param,*,iostat=stat) dummy_params%write_birth_rate
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_write_age)
-             read(param,*,iostat=stat) dummy_params%write_ave_age
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_redistrib_freq)
-             read(param,*,iostat=stat) dummy_params%redistrib_freq
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_random_seed)
-             read(param,*,iostat=stat) dummy_params%random_seed
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_disease_spread)
-             read(param,*,iostat=stat) dummy_params%disease_spread
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_disease_init)
-             read(param,*,iostat=stat) dummy_params%disease_init
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_disease_mort)
-             read(param,*,iostat=stat) dummy_params%disease_mort
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_disease_crit)
-             read(param,*,iostat=stat) dummy_params%disease_crit
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_disease)
-             read(param,*,iostat=stat) dummy_params%disease
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_write_demo)
-             read(param,*,iostat=stat) dummy_params%write_demo
-             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
-             present_array(i)=key
-          case(key_init_demo)
-             if (trim(param).eq."default")then
-                dummy_params%init_demo = .false.
-             else if(trim(param).eq."continuation")then
-                dummy_params%init_demo = .true.
-             else
-                call io_errors("Error in I/O: Error parsing value: "//param)
-             end if
-             present_array(i)=key
-             ! End: case_read
+             
           case default
              call io_errors("Error in I/O: Error parsing keyword: "//key)
           end select
@@ -420,14 +222,13 @@ contains
        call trace_exit("io_read_param")
        return
     end if
-
     ! Check for duplicates
-
     do i=0,max_params
        do j=0,max_params
           if (i.eq.j)cycle
+          !print*,present_array
           if (present_array(i).eq.present_array(j))then
-             !call io_errors("Error in I/O: Duplicate parameter found: "//present_array(i))
+             call io_errors("Error in I/O: Duplicate parameter found: "//present_array(i))
           end if
        end do
     end do
@@ -436,74 +237,6 @@ contains
     return
   end subroutine io_read_param
 
-
-  subroutine io_read_life(dummy_life,female)
-    !==============================================================================!
-    !                           I O _ R E A D _ L I F E                            !
-    !==============================================================================!
-    ! Subroutine for reading life files as dictated by the year specified in the   !
-    ! parameters file                                                              !
-    !------------------------------------------------------------------------------!
-    ! Arguments:                                                                   !
-    !           dummy_life,        intent :: inout                                 !
-    !------------------------------------------------------------------------------!
-    ! Author:   Z. Hawkhead  19/01/2020                                            !
-    !==============================================================================!
-    implicit none
-    type(life_table), intent(inout) :: dummy_life
-    logical                         :: female
-    integer                         :: wstat,stat,counter=0
-    character(30)                   :: name,first,second,life_str
-    real(dp)                        :: prob
-    logical                         :: file_exists
-    integer                         :: life_file
-
-    call trace_entry("io_read_life")
-#ifdef life_dir
-#define life_str life_dir
-#endif 
-
-
-    if(female)then
-
-       write(name,'("f_life_table_",I0,".csv")',iostat=stat) current_params%life_table_year
-       if (stat.ne.0) call io_errors("Error in I/O: Internal variable write error")
-       name=trim(name)
-    else
-       write(name,'("m_life_table_",I0,".csv")',iostat=stat) current_params%life_table_year
-       if (stat.ne.0) call io_errors("Error in I/O: Internal variable write error")
-       name=trim(name)
-    end if
-    !check if the User has used a correct file, if not, cause error
-
-    inquire(file=trim(life_str)//"/life_tables/"//name,exist=file_exists)
-
-    if (.not.file_exists) then
-
-       call io_errors("Error in I/O: No life table found: "//name)
-    end if
-
-    open(newunit=life_file,file=trim(life_str)//"/life_tables/"//name,status='old')
-
-    do while (trim(first) .ne. "0-1")
-       read(life_file,*)first,second
-    end do
-    counter=0
-    do while (stat.eq.0)
-       read(second,*,iostat=wstat) prob
-
-       if (wstat.ne.0) call io_errors("Error in I/O: Internal variable write error")
-       dummy_life%life_data(counter)=prob
-       read(life_file,*,iostat=stat) first,second
-
-       counter=counter+1
-    end do
-
-    dummy_life%year=current_params%life_table_year
-    close(life_file)
-    call trace_exit("io_read_life")
-    return
-  end subroutine io_read_life
 
 
 
@@ -573,7 +306,7 @@ contains
     ! internal variable for rank processing
     character(len=20)  :: file_name
 
-    write(file_name,'("err.",I0.4,".pop")') rank
+    write(file_name,'("err.",I0.4,".n_body")') rank
 
     open(2,file=trim(file_name),RECL=8192)
     write(*,*)"Error: called io_abort"
@@ -665,7 +398,6 @@ contains
              help=.true.
              if (arg_index.eq.nargs) call io_help
           case("-s","--search")
-             print*,"In seach cl parser" 
              write(*,*) trim(version)
              write(*,*) trim(info)
              write(*,*)
@@ -808,7 +540,7 @@ contains
     implicit none
     logical  :: print_flag
 
-    character(15) :: junk
+    character(30) :: junk
     integer       :: i ! loops 
     ! Allocate all the arrays for the parameters
     allocate(keys_array(1:max_keys))
@@ -822,109 +554,34 @@ contains
     ! assign the keys
     ! Begin: assign_keys
     keys_array(1)=trim(key_calc_len)
-    keys_array(2)=trim(key_init_pop)
-    keys_array(3)=trim(key_mean_child_age)
-    keys_array(4)=trim(key_child_sd)
-    keys_array(5)=trim(key_child_norm)
-    keys_array(6)=trim(key_write_pop)
-    keys_array(7)=trim(key_write_br)
-    keys_array(8)=trim(key_write_age)
-    keys_array(9)=trim(key_redistrib_freq)
-    keys_array(10)=trim(key_random_seed)
-    keys_array(11)=trim(key_debug)
-    keys_array(12)=trim(key_life_table_year)
-    keys_array(13)=trim(key_disease_spread)
-    keys_array(14)=trim(key_disease_init)
-    keys_array(15)=trim(key_disease_mort)
-    keys_array(16)=trim(key_disease_crit)
-    keys_array(17)=trim(key_disease)
-    keys_array(18)=trim(key_init_demo)
-    keys_array(19)=trim(key_write_demo)
+    keys_array(2)=trim(key_time_step)
+    keys_array(3)=trim(key_dry_run)
+    keys_array(4)=trim(key_debug)
     ! End: assign_keys
 
     ! Begin: assign_default
     write(junk,*)current_params%calc_len 
     keys_default(1)=trim(adjustl(junk))
-    write(junk,*)current_params%init_pop 
+    write(junk,*)current_params%time_step
     keys_default(2)=trim(adjustl(junk))
-    write(junk,'(f5.2)')current_params%child_age 
+    write(junk,*)current_params%dry_run
     keys_default(3)=trim(adjustl(junk))
-    write(junk,'(f4.2)')current_params%child_sd  
+    write(junk,*)current_params%debuging
     keys_default(4)=trim(adjustl(junk))
-    write(junk,'(f4.2)')current_params%child_norm 
-    keys_default(5)=trim(adjustl(junk))
-    write(junk,*)current_params%write_population 
-    keys_default(6)=trim(adjustl(junk))
-    write(junk,*)current_params%write_birth_rate 
-    keys_default(7)=trim(adjustl(junk))
-    write(junk,*)current_params%write_ave_age 
-    keys_default(8)=trim(adjustl(junk))
-    junk="CALC_LEN/10" ! Speical case 
-    keys_default(9)=trim(adjustl(junk))
-    junk="RANDOMISED"  ! Special case
-    keys_default(10)=trim(adjustl(junk))
-    write(junk,*)current_params%debuging 
-    keys_default(11)=trim(adjustl(junk))
-    write(junk,*)current_params%life_table_year
-    keys_default(12)=trim(adjustl(junk))
-    write(junk,'(f4.2)')current_params%disease_spread
-    keys_default(13)=trim(adjustl(junk))
-    write(junk,'(f4.2)')current_params%disease_init
-    keys_default(14)=trim(adjustl(junk))
-    write(junk,'(f4.2)')current_params%disease_mort
-    keys_default(15)=trim(adjustl(junk))
-    write(junk,'(f4.2)')current_params%disease_crit
-    keys_default(16)=trim(adjustl(junk))
-    write(junk,*)current_params%disease
-    keys_default(17)=trim(adjustl(junk))
-    write(junk,*)current_params%init_demo
-    keys_default(18)=trim(adjustl(junk))
-    write(junk,*)current_params%write_demo
-    keys_default(19)=trim(adjustl(junk))
     ! End: assign_default
 
     ! Begin: assign_description
-    keys_description(1)="Length of the calculation in years"
-    keys_description(2)="Initial total population, combined men and women"
-    keys_description(3)="Mean age for a woman to have a child, modelled as a Gaussian"
-    keys_description(4)="Standard deviation for the birth probability"
-    keys_description(5)="Number of children a woman will have on average in her lifetime"
-    keys_description(6)="Write the population data to a file 'population.pop'"
-    keys_description(7)="Write the birth rate data to file 'birth_rate.pop'"
-    keys_description(8)="Write the avergae age data to file 'ave_age.pop'"
-    keys_description(9)="Interval for parallel redistribution of population data and reporting, in years"
-    keys_description(10)="Provide a random seed for reproducability"
-    keys_description(11)="Toggle code profilling"
-    keys_description(12)="Select year for life US life table"
-    keys_description(13)="Maximum probablility of the catching the disease, varies as a function of population"
-    keys_description(14)="Initial number of people with the disease"
-    keys_description(15)="Increase in mortality rate for a person with the disease"
-    keys_description(16)="Deseased population fraction when contagion is highest"
-    keys_description(17)="Toggle for running a calculation with disease"
-    keys_description(18)="Initialise the population from the final demographics of a previous calculation"
-    keys_description(19)="Write demographic data to file 'demographics.pop'"
+    keys_description(1)="Length of the calculation in days"
+    keys_description(2)="Size of the time step used for integration"
+    keys_description(3)="Initialise calculation to check input files"
+    keys_description(4)="Turn on profilling and debugging"
     ! End: assign_description
     
     ! Begin: assign_allowed
-    keys_allowed(1)= "(any integer) > 0"
-    keys_allowed(2)= "(any integer) > 0"
-    keys_allowed(3)= "(any integer) > 0"
-    keys_allowed(4)= "(any integer) > 0"
-    keys_allowed(5)= "(any real) > 0"
-    keys_allowed(6)= "Boolean"
-    keys_allowed(7)= "Boolean"
-    keys_allowed(8)= "Boolean"
-    keys_allowed(9)= "(any integer) > 0"
-    keys_allowed(10)= "(any integer)"
-    keys_allowed(11)= "Boolean"
-    keys_allowed(12)= "2011 < (any integer) < 2018"
-    keys_allowed(13)= "0.0 < (any real) < 1.0"
-    keys_allowed(14)= "0.0 < (any real) < 1.0"
-    keys_allowed(15)= "(any real) > 0.0"
-    keys_allowed(16)= "0.0 < (any real) < 1.0"
-    keys_allowed(17)= "Boolean"
-    keys_allowed(18)= "DEFAULT,CONTINUATION"
-    keys_allowed(19)= "Boolean"
+    keys_allowed(1)= "(any real) > 0"
+    keys_allowed(2)= "(any real) > 0"
+    keys_allowed(3)= "Boolean"
+    keys_allowed(4)= "Boolean"
     ! End: assign_allowed
     
     ! do the loop for printing stuff
@@ -999,20 +656,32 @@ contains
        compile_version=trim(compile_version(87:97))
     end if
 
-
-    write(stdout,*) "+==================================================================================+"
-    write(stdout,*) '|        888b     d888  .d8888b.          8888888b.   .d88888b.  8888888b.         |'
-    write(stdout,*) '|        8888b   d8888 d88P  Y88b         888   Y88b d88P" "Y88b 888   Y88b        |'
-    write(stdout,*) '|        88888b.d88888 888    888         888    888 888     888 888    888        |'
-    write(stdout,*) '|        888Y88888P888 888                888   d88P 888     888 888   d88P        |'
-    write(stdout,*) '|        888 Y888P 888 888                8888888P"  888     888 8888888P"         |'
-    write(stdout,*) '|        888  Y8P  888 888    888         888        888     888 888               |'
-    write(stdout,*) '|        888   "   888 Y88b  d88P         888        Y88b. .d88P 888               |'
-    write(stdout,*) '|        888       888  "Y8888P" 88888888 888         "Y88888P"  888               |'
-    write(stdout,*) '+----------------------------------------------------------------------------------+'
-    write(stdout,*) "|       ",trim(version),"                                                  |"
-    write(stdout,*) "+==================================================================================+"
-    write(stdout,*)
+    write(stdout,*) '+==============================================================================================+'
+    write(stdout,*) '|                       .                        ___                                           |'
+    write(stdout,*) '|           .                      *          ,o88888                               *          |'
+    write(stdout,*) '|                                          ,o8888888"           .                              |'
+    write(stdout,*) '|  o                 ,:o:o:oooo.        ,8O88Pd8888"                                           |'
+    write(stdout,*) '|                ,.::.::o:ooooOoOoO. ,oO8O8Pd888""                       *                     |'
+    write(stdout,*) '|       *      ,.:.::o:ooOoOoOO8O8OOo.8OOPd8O8O"                                      .        |'
+    write(stdout,*) '|             , ..:.::o:ooOoOOOO8OOOOo.FdO8O8"          *                     o                |'
+    write(stdout,*) '|            , ..:.::o:ooOoOO8O888O8O,COCOO"                                                   |'
+    write(stdout,*) '|           , . ..:.::o:ooOoOOOO8OOOOCOCO"                                                     |'
+    write(stdout,*) '|    *      . ..:.::o:ooOoOoOO8O8OCCCC"o          88b 88       88""Yb  dP"Yb  8888b.  Yb  dP   |'
+    write(stdout,*) '|              . ..:.::o:ooooOoCoCCC"o:o          88Yb88       88__dP dP   Yb  8I  Yb  YbdP    |'
+    write(stdout,*) '|              . ..:.::o:o:,cooooCo"oo:o:         88 Y88       88""Yb Yb   dP  8I  dY   8P     |'
+    write(stdout,*) '|           `   . . ..:.:cocoooo""o:o:::"         88  Y8 ooooo 88oodP  YbodP  8888Y"   dP      |'
+    write(stdout,*) '|  o        .`   . ..::ccccoc""o:o:o:::"                                                       |'
+    write(stdout,*) '|          :.:.    ,c:cccc"":.:.:.:.:."                                   .                    |'
+    write(stdout,*) '|        ..:.:""`::::c:""..:.:.:.:.:."        o         .                                *     |'
+    write(stdout,*) '|      ...:.".:.::::""    . . . . ."                                                           |'
+    write(stdout,*) '|     .. . ....:."" `   .  . . ""                              .                   |           |'
+    write(stdout,*) '|   . . . ....""                     o                                            -O-      .   |'
+    write(stdout,*) '|   .. . .""      *                              *                                 |           |'
+    write(stdout,*) '|  .                                                                    o                      |'
+    write(stdout,*) '|                            .                                                                 |'
+    write(stdout,*) '+----------------------------------------------------------------------------------------------+'
+    write(stdout,'(1x,"|",10x,a,T97,"|")') trim(version)    
+    write(stdout,*) '+==============================================================================================+'
     write(stdout,*) "Compiled with ",compiler," ",Trim(compile_version), " on ", __DATE__, " at ",__TIME__
     write(stdout,*) "Communications architechture: ",comms_arch
     if (comms_arch.eq."MPI")then
@@ -1071,7 +740,7 @@ contains
     !==============================================================================!
     implicit none
     character(50)   :: sec_title
-    integer         :: width=84,length
+    integer         :: width=97,length
     ! Stuff for getting run time
     character(len=3),dimension(12)  :: months
     integer                         :: d_t(8)    
@@ -1083,11 +752,11 @@ contains
     call date_and_time(b(1), b(2), b(3), d_t)
     months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
-    write(stdout,*)"+"//repeat("-",(width-15)/2)//" RUN STARTED "//repeat("-",(width-15)/2)//"+"
+    write(stdout,*)"+"//repeat("-",(width-15)/2)//" RUN STARTED "//repeat("-",(width-16)/2)//"+"
     write(stdout,1000) d_t(5),d_t(6),d_t(7),trim(months(d_t(2))),d_t(3),d_t(1)
     write(stdout,*)"+"//repeat("-",width-3)//"+"
     write(stdout,*) " "
-1000 FORMAT(1x,"|",30x,i2.2,":",i2.2,":",i2.2,",",1x,A,1x,i2.2,1x,i4,30x,"|")
+1000 FORMAT(1x,"|",36x,i2.2,":",i2.2,":",i2.2,",",1x,A,1x,i2.2,1x,i4,37x,"|")
 10  format(1x,A,T44,':',5x,I12,1x,A)    !integer
 11  format(1x,A,T44,":",5x,f12.2,1x,A)  !real
 12  format(1x,A,T44,":",5x,L12,1x,A)    !logical
@@ -1105,70 +774,7 @@ contains
        write(stdout,*)"Parameters file not found, using defaults"
     end if
 
-    sec_title="Calculation Parameters"
-    length=len(trim(sec_title))
-    write(stdout,*)repeat("-",(width-length)/2-2)//"  "//trim(sec_title)//" "//repeat("-",(width-length)/2-2)
-    write(stdout,14) "Initial Population", real(current_params%init_pop)
-    write(stdout,14)"Calculation Length",real(current_params%calc_len),"years"
-    if (current_params%init_demo)then
-
-       write(stdout,13)"Demographics Initialisation","Previous Run"
-    else
-       write(stdout,13)"Demographics Initialisation","Default"
-    end if
-    sec_title="Birth Parameters"
-    length=len(trim(sec_title))
-    write(stdout,*)repeat("-",(width-length)/2-2)//"  "//trim(sec_title)//" "//repeat("-",(width-length)/2-2)
-
-    write(stdout,11)"Average Age",current_params%child_age
-    write(stdout,11)"Standard Deviation",current_params%child_sd,"years"
-    write(stdout,11)"Children per Woman",current_params%child_norm 
-
-    sec_title="Death Parameters"
-    length=len(trim(sec_title))
-    write(stdout,*)repeat("-",(width-length)/2-2)//"  "//trim(sec_title)//" "//repeat("-",(width-length)/2-2)
-
-    write(stdout,10)"Life Table year",current_params%life_table_year
-
-
-    sec_title="Disease Parameters"
-    length=len(trim(sec_title))
-    write(stdout,*)repeat("-",(width-length)/2-2)//"  "//trim(sec_title)//" "//repeat("-",(width-length)/2-2)
-
-    write(stdout,12)"Disease Present",current_params%disease
-    if (current_params%disease)then
-       write(stdout,11)"Contagiousness",current_params%disease_spread*100_dp,"%"
-       write(stdout,11)"Initial Infected Population",current_params%disease_init*100_dp,"%"
-       write(stdout,11)"Disease Severity",current_params%disease_mort*100_dp,"%"
-       write(stdout,11)"Disease Critical Mass",current_params%Disease_crit*100_dp,"% population diseased"
-    end if
-
-
-    sec_title="I/O Parameters"
-    length=len(trim(sec_title))
-    write(stdout,*)repeat("-",(width-length)/2-2)//"  "//trim(sec_title)//" "//repeat("-",(width-length)/2-2)
-
-    write(stdout,12)"Write Population Data",current_params%write_population
-    write(stdout,12)"Write Age Data" ,current_params%write_ave_age
-    write(stdout,12)"Write Birth Rate Data",current_params%write_birth_rate
-    write(stdout,12)"Write Demographics Data",current_params%write_demo
-
-    sec_title="General Parameters"
-    length=len(trim(sec_title))
-    write(stdout,*)repeat("-",(width-length)/2-2)//"  "//trim(sec_title)//" "//repeat("-",(width-length)/2-2)
-    write(stdout,10) "Redistribition Frequency",current_params%redistrib_freq, "years"
-    write(stdout,12) "Profilling",current_params%debuging
-    write(stdout,10) "Random Seed",current_params%random_seed
-    if(comms_arch.eq."MPI")then
-       sec_title="Parallelisation Parameters"
-       length=len(trim(sec_title))
-       write(stdout,*)repeat("-",(width-length)/2-2)//"  "//trim(sec_title)//" "//repeat("-",(width-length)/2-2)
-       write(stdout,10)"Number of Cores",nprocs
-    end if
-
-
-    write(stdout,*) repeat("-",width-1)
-
+    
     call trace_exit("io_write_params")
     return
   end subroutine io_write_params
@@ -1176,26 +782,14 @@ contains
 
 
 
-  subroutine io_write_results(res,survived)
-    !==============================================================================!
-    !                       I O _ W R I T E _ R E S U L T S                        !
-    !==============================================================================!
-    ! Subroutine used to write out the results calculated in the calculation       !
-    ! which are stored in the derived data type 'results'.                         !
-    !------------------------------------------------------------------------------!
-    ! Arguments:                                                                   !
-    !           res,               intent :: in                                    !
-    !           survived,          intent :: in                                    !
-    !------------------------------------------------------------------------------!
-    ! Author:   Z. Hawkhead  29/02/2020                                            !
-    !==============================================================================!
+  subroutine io_write_results()
+
 
     implicit none
-    type(results)          :: res
     logical               :: survived
 
     character(50)   :: sec_title
-    integer         :: width=84,length
+    integer         :: width=97,length
     ! Stuff for getting run time
     character(len=3),dimension(12)  :: months
     integer                         :: d_t(8)    
@@ -1206,90 +800,20 @@ contains
 11  format(1x,A,T44,":",5x,f9.2,1x,A)  !real
 12  format(1x,A,T44,":",5x,L9,1x,A)    !logical
 
-    if(survived)then 
-       sec_title="Population Properties"
-       length=len(trim(sec_title))
-       write(stdout,*) ""
-       write(stdout,*)repeat("-",(width-length)/2-2)//"  "//trim(sec_title)//" "//repeat("-",(width-length)/2-1)
 
-       write(stdout,11) "Average Age",res%ave_age,"years"
-       write(stdout,11) "Average Life Expectancy",res%life_expectancy,"years"
-       write(stdout,11) "Average Teen Pregnacy Rate",res%teen_preg,"per 1000"
-       write(stdout,11) "Average Infant Mortality Rate",res%infant_mort,"per 1000"
-       write(stdout,11) "Average Birth Rate",res%birth_rate,"per 1000"
-       write(stdout,11) "Percentage Men",res%men_pc,"%"
-       write(stdout,11) "Percentage Women",100_dp-res%men_pc,"%"
-       sec_title="Demographics"
-       length=len(trim(sec_title))
-       write(stdout,*)repeat("-",(width-length)/2-2)//"  "//trim(sec_title)//" "//repeat("-",(width-length)/2-2)
-
-
-       write(stdout,11) "Age <5",res%lt_5,"%"
-       write(stdout,11) "Age 10-19",res%i10_20,"%"
-       write(stdout,11)	"Age 20-29",res%i20_30,"%"
-       write(stdout,11)	"Age 30-39",res%i30_40,"%"
-       write(stdout,11)	"Age 40-49",res%i40_50,"%"
-       write(stdout,11)	"Age 50-64",res%i50_65,"%"
-       write(stdout,11)	"Age 65+",res%i65_plus,"%"
-       write(stdout,11)	"Age 85+",res%i85_plus,"%"
-       write(stdout,*) repeat("-",width-1)
-    end if
-    write(stdout,*)
-
-
+    
     call date_and_time(b(1), b(2), b(3), d_t)
     months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
-    write(stdout,*)"+"//repeat("-",(width-15)/2)//" RUN FINISHED "//repeat("-",(width-17)/2)//"+"
+    write(stdout,*)"+"//repeat("-",(width-15)/2)//" RUN FINISHED "//repeat("-",(width-18)/2)//"+"
     write(stdout,1000) d_t(5),d_t(6),d_t(7),trim(months(d_t(2))),d_t(3),d_t(1)
     write(stdout,*)"+"//repeat("-",width-3)//"+"
 
-1000 FORMAT(1x,"|",30x,i2.2,":",i2.2,":",i2.2,",",1x,A,1x,i2.2,1x,i4,30x,"|")
+1000 FORMAT(1x,"|",36x,i2.2,":",i2.2,":",i2.2,",",1x,A,1x,i2.2,1x,i4,37x,"|")
 
     call trace_exit("io_write_results")
     return 
   end subroutine io_write_results
-
-
-  subroutine io_survival(survival)
-    !==============================================================================!
-    !                            I O _ S U R V I V A L                             !
-    !==============================================================================!
-    ! Subroutine for writing to the stdout out.pop, reporting the survival of      !
-    ! the species.                                                                 !
-    !------------------------------------------------------------------------------!
-    ! Arguments:                                                                   !
-    !           survival,          intent :: inout                                 !
-    !------------------------------------------------------------------------------!
-    ! Author:   Z. Hawkhead  23/02/2020                                            !
-    !==============================================================================!
-    implicit none
-    logical,intent(inout) :: survival
-
-    character(len=100)    :: text
-    integer               :: width=84,span=50
-    call trace_entry("io_survival")
-45  format(17x,A)
-    write(stdout,*)
-    if(survival) then 
-       write(stdout,45) "************************************************"
-       write(stdout,45) "*                                              *"
-       write(stdout,45) "*            Species Survived!! :)             *"
-       write(stdout,45) "*                                              *"
-       write(stdout,45) "************************************************"
-
-    else
-       write(stdout,45) "************************************************"
-       write(stdout,45) "*                                              *"
-       write(stdout,45) "*          Species Went Extinct!! :(           *"
-       write(stdout,45) "*                                              *"
-       write(stdout,45) "************************************************"
-
-    end if
-    call trace_exit("io_survival")
-    return
-
-  end subroutine io_survival
 
   function io_present(key) result(is_present)
     !==============================================================================!
