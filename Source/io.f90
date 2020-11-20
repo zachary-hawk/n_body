@@ -40,7 +40,8 @@ module io
      logical          :: dry_run           = .false.
 
      character(len=30) :: diff_method = 'euler'
-     real(dp) :: epsilon =    0.0000000000000000     
+     real(dp) :: epsilon =    0.0000000000000000
+     logical :: write_config = .true.
      ! %End: parameters
   end type parameters
 
@@ -51,6 +52,7 @@ module io
   character(len=30),parameter,public :: key_dry_run          = "dryrun"
   character(len=30),parameter,public :: key_diff_method      = 'ode_solver'
   character(len=30),parameter,public ::key_epsilon   = 'pot_soften'
+  character(len=30),parameter,public ::key_write_config   = 'write_output_configuration'
   ! %End: keys
 
 
@@ -60,8 +62,7 @@ module io
   end type results
 
 
-  type(parameters),public,save             :: current_params
-  integer,parameter::max_keys=           6
+  integer,parameter::max_keys=           7
   ! %End: max_param
 
 
@@ -80,6 +81,8 @@ module io
 
   end type structure
 
+  
+  type(parameters),public,save :: current_params
   type(structure),public,save :: current_structure
 
   !-------------------------------------------------------!
@@ -585,6 +588,7 @@ contains
     keys_array(4)=trim(key_debug)
     keys_array(5)=trim(key_diff_method)
     keys_array(6)=trim(key_epsilon)
+    keys_array(7)=trim(key_write_config)
     ! %End: assign_keys
 
     ! %Begin: assign_default
@@ -598,8 +602,10 @@ contains
     keys_default(4)=trim(adjustl(junk))
     write(junk,*)current_params%diff_method
     keys_default(5)=trim(adjustl(junk))
-    write(junk,*)current_params%epsilon                                                     
+    write(junk,*)current_params%epsilon
     keys_default(6)=trim(adjustl(junk))
+    write(junk,*)current_params%write_config                                                
+    keys_default(7)=trim(adjustl(junk))
     ! %End: assign_default
 
     ! %Begin: assign_description
@@ -609,6 +615,7 @@ contains
     keys_description(4)="Turn on profilling and debugging"
     keys_description(5)='Chose method for solving ODEs.'
     keys_description(6)='Amount of softening used in the gravitational potential to avoid singularities'
+    keys_description(7)='Specify whether or not to write final configuration into STRUCT file format.'
     ! %End: assign_description
 
     ! %Begin: assign_allowed
@@ -618,6 +625,7 @@ contains
     keys_allowed(4)= "Boolean"
     keys_allowed(5)='euler'
     keys_allowed(6)='(any real) > 0'
+    keys_allowed(7)='Boolean'
     ! %End: assign_allowed
 
     ! do the loop for printing stuff
@@ -910,21 +918,21 @@ contains
     character(len=100) :: line
 
     call trace_entry("io_read_structure")
+
     
 
 
-    
     call trace_exit("io_read_structure")
     return
   end subroutine io_read_structure
-  
+
 
 
   subroutine io_cart_to_radial(pos_array)
     implicit none
 
     real(dp),dimension(:,:), intent(inout) :: pos_array
-    real(dp),dimension(:,:),allocatable  :: rad_array 
+    real(dp),dimension(:,:),allocatable  :: rad_array
     integer  :: stat
 
     call trace_entry("io_cart_to_radial")
@@ -947,7 +955,7 @@ contains
 
     if (allocated(rad_array))deallocate(rad_array)
     call trace_exit("io_cart_to_radial")
-    return 
+    return
   end subroutine io_cart_to_radial
 
 
@@ -955,9 +963,9 @@ contains
     implicit none
 
     real(dp),dimension(:,:), intent(inout) :: pos_array
-    real(dp),dimension(:,:),allocatable  :: rad_array 
+    real(dp),dimension(:,:),allocatable  :: rad_array
     integer  :: stat
- 
+
     call trace_entry("io_radial_to_cart")
 
 
@@ -971,14 +979,19 @@ contains
     pos_array(:,1)=rad_array(:,1)
     pos_array(:,2)=rad_array(:,2)
     pos_array(:,3)=rad_array(:,3)
-    
+
     if (allocated(rad_array))deallocate(rad_array)
     call trace_exit("io_radial_to_cart")
     return
   end subroutine io_radial_to_cart
 
 
-  
+
+
+
+
+
 end module io
+ 
  
  
