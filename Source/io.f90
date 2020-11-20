@@ -11,13 +11,13 @@ module io
   logical,           public                :: no_param,read_params=.true.
   character(len=128),public                :: version  = "N_BODY v.1.0, Z. Hawkhead"
   character(len=128),public                :: info     = "Parallel code for n-body gravitational simulations."
-  integer,           public,parameter      :: stdout = 984 
+  integer,           public,parameter      :: stdout = 984
   integer,           public,parameter      :: dp = real64
   real,              public,parameter      :: pi=3.1415926535_dp
   real(dp),          public,parameter      :: G= 6.67430E-11
   logical,           public                :: file_exists
   logical,           public                :: file_exists_struct
-  
+
   character(100),dimension(:),allocatable  :: present_array
 
   character(100),dimension(:),allocatable  :: keys_array
@@ -26,11 +26,11 @@ module io
   character(100),dimension(:),allocatable  :: keys_allowed
   character(100),dimension(:),allocatable  :: keys_type
 
-  
+
   integer                                  :: max_params=1
 
   type  parameters
-     ! Begin: parameters
+     ! %Begin: parameters
 
      !Calculation parameters
      real(dp)         :: calc_len          = 100.0
@@ -38,31 +38,49 @@ module io
 
      logical          :: debuging         = .false.
      logical          :: dry_run           = .false.
-     
-     ! End: parameters
+
+     character(len=30) :: diff_method = 'euler'
+     real(dp) :: epsilon =    0.0000000000000000     
+     ! %End: parameters
   end type parameters
 
-  ! Begin: keys
+  ! %Begin: keys
   character(len=30),parameter,public :: key_calc_len         = "calculation_length"
   character(len=30),parameter,public :: key_time_step        = "time_step"
   character(len=30),parameter,public :: key_debug            = "debug"
-  character(len=30),parameter,public :: key_dry_run            = "dryrun"
-  
+  character(len=30),parameter,public :: key_dry_run          = "dryrun"
+  character(len=30),parameter,public :: key_diff_method      = 'ode_solver'
+  character(len=30),parameter,public ::key_epsilon   = 'pot_soften'
+  ! %End: keys
 
-  ! End: keys
 
-  
   type results
      real(dp)  :: birth_rate
-  
+
   end type results
 
 
   type(parameters),public,save             :: current_params
+  integer,parameter::max_keys=           6
+  ! %End: max_param
 
-  ! No. Parameter keys
-  integer,parameter                        :: max_keys = 4
 
+
+  type structure
+     real(dp)         ,allocatable,dimension(:,:) :: positions     ! Grid of positions, all initialisations default to this
+     real(dp)         ,allocatable,dimension(:)   :: masses        ! Massess of all the particles
+     real(dp)         ,allocatable,dimension(:,:) :: init_velocity ! Initial velocities of all particles
+     character(len=15),allocatable,dimension(:)   :: labels        ! Labels, can be custom or automatically defined
+     integer                                      :: n_bodies      ! Number of particles, used to define the arrays
+     logical                                      :: init_radial   ! Gives the radial initialisation scheme
+     logical                                      :: init_cart     ! Gives the cartesian initialisation scheme
+     logical                                      :: init_grid     ! Gives the grid initialisation scheme
+     integer                                      :: nx, ny, nz    ! Grid dimensions for grid initialisation n_bodies=nx*ny*nz
+     real(dp)                                     :: dnx,dny,dnz   ! Grid spacings for grid initalisation
+
+  end type structure
+
+  type(structure),public,save :: current_structure
 
   !-------------------------------------------------------!
   !              P U B L I C  R O U T I N E S             !
@@ -121,7 +139,12 @@ contains
     if (read_params) call io_read_param(current_params)
 
 
-    
+    ! Try and open the struct file
+    inquire(file="struct.n_body",exist=file_exists_struct)
+    if (.not.file_exists_struct)call io_errors("Error in I/O: No structure file")
+    if (file_exists_struct) call io_read_structure()
+
+
     ! Open up the main file for the output
     open(stdout,file="out.n_body",RECL=8192,form="FORMATTED",access="append")
 
@@ -160,7 +183,7 @@ contains
     character(len=30) :: key         ! the keyword used
     character(len=30) :: param       ! the value of the param
     logical           :: comment     ! boolean for comment line, will skip
-    real(dp)          :: real_dump   ! a dump for handling scientific 
+    real(dp)          :: real_dump   ! a dump for handling scientific
     call trace_entry("io_read_param")
 
     !Open the parameter file
@@ -191,25 +214,28 @@ contains
           param=adjustl(trim(io_case(param)))
 
 
-          ! Begin: case_read
+          ! %Begin: case_read
           select case(key)
           case(key_calc_len)
              read(param,*,iostat=stat) dummy_params%calc_len
              if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
              present_array(i)=key
-          case(key_time_step) 
+          case(key_time_step)
              read(param,*,iostat=stat) dummy_params%time_step
              if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
              present_array(i)=key
-          case(key_debug) 
+          case(key_debug)
              read(param,*,iostat=stat) dummy_params%debuging
              if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
              present_array(i)=key
-          case(key_dry_run) 
+          case(key_dry_run)
              read(param,*,iostat=stat) dummy_params%dry_run
              if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
              present_array(i)=key
-             
+          case(key_diff_method                                                 )
+             read(param,*,iostat=stat) dummy_params%diff_method
+             if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
+             present_array(i)=key
           case default
              call io_errors("Error in I/O: Error parsing keyword: "//key)
           end select
@@ -332,12 +358,12 @@ contains
     !------------------------------------------------------------------------------!
     ! Author:   Z. Hawkhead  19/01/2020                                            !
     !==============================================================================!
-    character(len=*)           :: string 
+    character(len=*)           :: string
 
-    character(len=len(string)) :: new 
+    character(len=len(string)) :: new
 
-    integer                    :: i 
-    integer                    :: k 
+    integer                    :: i
+    integer                    :: k
     integer                    :: length
     logical, optional          :: upper
 
@@ -423,7 +449,7 @@ contains
              if (help)then
                 call io_help(name)
                 help=.false.
-             elseif(search)then 
+             elseif(search)then
                 call io_search(io_case(name))
                 search=.false.
                 stop
@@ -478,7 +504,7 @@ contains
           write(*,*) "************** NO MATCHING PARAMETERS **************"
           write(*,*)
        end if
-    else 
+    else
 30     format(4x,A,T40,A)
        write(*,30) "-v","Print version information."
        write(*,30) "-h,--help   <keyword>","Get help and commandline options."
@@ -540,8 +566,8 @@ contains
     implicit none
     logical  :: print_flag
 
-    character(30) :: junk
-    integer       :: i ! loops 
+    character(60) :: junk
+    integer       :: i ! loops
     ! Allocate all the arrays for the parameters
     allocate(keys_array(1:max_keys))
     allocate(keys_default(1:max_keys))
@@ -552,15 +578,17 @@ contains
 
 
     ! assign the keys
-    ! Begin: assign_keys
+    ! %Begin: assign_keys
     keys_array(1)=trim(key_calc_len)
     keys_array(2)=trim(key_time_step)
     keys_array(3)=trim(key_dry_run)
     keys_array(4)=trim(key_debug)
-    ! End: assign_keys
+    keys_array(5)=trim(key_diff_method)
+    keys_array(6)=trim(key_epsilon)
+    ! %End: assign_keys
 
-    ! Begin: assign_default
-    write(junk,*)current_params%calc_len 
+    ! %Begin: assign_default
+    write(junk,*)current_params%calc_len
     keys_default(1)=trim(adjustl(junk))
     write(junk,*)current_params%time_step
     keys_default(2)=trim(adjustl(junk))
@@ -568,25 +596,33 @@ contains
     keys_default(3)=trim(adjustl(junk))
     write(junk,*)current_params%debuging
     keys_default(4)=trim(adjustl(junk))
-    ! End: assign_default
+    write(junk,*)current_params%diff_method
+    keys_default(5)=trim(adjustl(junk))
+    write(junk,*)current_params%epsilon                                                     
+    keys_default(6)=trim(adjustl(junk))
+    ! %End: assign_default
 
-    ! Begin: assign_description
+    ! %Begin: assign_description
     keys_description(1)="Length of the calculation in days"
     keys_description(2)="Size of the time step used for integration"
     keys_description(3)="Initialise calculation to check input files"
     keys_description(4)="Turn on profilling and debugging"
-    ! End: assign_description
-    
-    ! Begin: assign_allowed
+    keys_description(5)='Chose method for solving ODEs.'
+    keys_description(6)='Amount of softening used in the gravitational potential to avoid singularities'
+    ! %End: assign_description
+
+    ! %Begin: assign_allowed
     keys_allowed(1)= "(any real) > 0"
     keys_allowed(2)= "(any real) > 0"
     keys_allowed(3)= "Boolean"
     keys_allowed(4)= "Boolean"
-    ! End: assign_allowed
-    
+    keys_allowed(5)='euler'
+    keys_allowed(6)='(any real) > 0'
+    ! %End: assign_allowed
+
     ! do the loop for printing stuff
 
-    if (print_flag)then 
+    if (print_flag)then
 100    format(1x,A,T35,A)
        write(*,*)
        do i=1,max_keys
@@ -619,7 +655,7 @@ contains
     character(len=3) :: MPI_version_num
     character(len=100):: compile_version,cpuinfo
     character(len=5) :: opt
-    
+
     call trace_entry("io_header")
 
 
@@ -644,10 +680,10 @@ contains
 #endif
 
 
-    
+
 #define opt opt_strat
 
-    
+
 
     compile_version=compiler_version()
     if (compiler.eq."Intel Compiler")then
@@ -680,7 +716,7 @@ contains
     write(stdout,*) '|  .                                                                    o                      |'
     write(stdout,*) '|                            .                                                                 |'
     write(stdout,*) '+----------------------------------------------------------------------------------------------+'
-    write(stdout,'(1x,"|",10x,a,T97,"|")') trim(version)    
+    write(stdout,'(1x,"|",10x,a,T97,"|")') trim(version)
     write(stdout,*) '+==============================================================================================+'
     write(stdout,*) "Compiled with ",compiler," ",Trim(compile_version), " on ", __DATE__, " at ",__TIME__
     write(stdout,*) "Communications architechture: ",comms_arch
@@ -708,13 +744,13 @@ contains
     implicit none
     call trace_entry("io_dryrun")
     if (on_root_node)then
-       write(stdout,*) " " 
-       write(stdout,'(23x,A)') "****************************************"
-       write(stdout,'(23x,A)') "*                                      *"
-       write(stdout,'(23x,A)') "*         Dryrun complete....          *"
-       write(stdout,'(23x,A)') "*          No errors found             *"
-       write(stdout,'(23x,A)') "*                                      *"
-       write(stdout,'(23x,A)') "****************************************"
+       write(stdout,*) " "
+       write(stdout,'(28x,A)') "****************************************"
+       write(stdout,'(28x,A)') "*                                      *"
+       write(stdout,'(28x,A)') "*         Dryrun complete....          *"
+       write(stdout,'(28x,A)') "*          No errors found             *"
+       write(stdout,'(28x,A)') "*                                      *"
+       write(stdout,'(28x,A)') "****************************************"
     end if
 
     call trace_exit("io_dryrun")
@@ -743,7 +779,7 @@ contains
     integer         :: width=97,length
     ! Stuff for getting run time
     character(len=3),dimension(12)  :: months
-    integer                         :: d_t(8)    
+    integer                         :: d_t(8)
     character*10                    :: b(3)
 
 
@@ -761,7 +797,7 @@ contains
 11  format(1x,A,T44,":",5x,f12.2,1x,A)  !real
 12  format(1x,A,T44,":",5x,L12,1x,A)    !logical
 13  format(1x,A,T44,":",5x,A12,1x,A)    !character
-14  format(1x,A,T44,":",5x,ES12.2,1x,A)  !Science 
+14  format(1x,A,T44,":",5x,ES12.2,1x,A)  !Science
 
 
 
@@ -774,7 +810,7 @@ contains
        write(stdout,*)"Parameters file not found, using defaults"
     end if
 
-    
+
     call trace_exit("io_write_params")
     return
   end subroutine io_write_params
@@ -792,7 +828,7 @@ contains
     integer         :: width=97,length
     ! Stuff for getting run time
     character(len=3),dimension(12)  :: months
-    integer                         :: d_t(8)    
+    integer                         :: d_t(8)
     character*10                    :: b(3)
     call trace_entry("io_write_results")
 
@@ -801,7 +837,7 @@ contains
 12  format(1x,A,T44,":",5x,L9,1x,A)    !logical
 
 
-    
+
     call date_and_time(b(1), b(2), b(3), d_t)
     months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -812,7 +848,7 @@ contains
 1000 FORMAT(1x,"|",36x,i2.2,":",i2.2,":",i2.2,",",1x,A,1x,i2.2,1x,i4,37x,"|")
 
     call trace_exit("io_write_results")
-    return 
+    return
   end subroutine io_write_results
 
   function io_present(key) result(is_present)
@@ -861,11 +897,88 @@ contains
     !call trace_entry("io_flush")
     call flush(unit)
     !call trace_exit("io_flush")
-    return 
+    return
   end subroutine io_flush
 
 
 
+  subroutine io_read_structure()
+    implicit none
+    integer :: n
+    integer :: stat
+
+    character(len=100) :: line
+
+    call trace_entry("io_read_structure")
+    
 
 
+    
+    call trace_exit("io_read_structure")
+    return
+  end subroutine io_read_structure
+  
+
+
+  subroutine io_cart_to_radial(pos_array)
+    implicit none
+
+    real(dp),dimension(:,:), intent(inout) :: pos_array
+    real(dp),dimension(:,:),allocatable  :: rad_array 
+    integer  :: stat
+
+    call trace_entry("io_cart_to_radial")
+
+
+    allocate(rad_array(1:current_structure%n_bodies,1:3),stat=stat)
+    if (stat.ne.0)call io_errors("Error in I/O: allocate rad_array")
+
+    rad_array(:,1)=sqrt(pos_array(:,1)**2 &
+         & + pos_array(:,2)**2 &
+         & + pos_array(:,3)**2)
+
+    rad_array(:,2)=atan2(pos_array(:,2),pos_array(:,1))
+    rad_array(:,3)=atan(sqrt((pos_array(:,1)**2 &
+         & + pos_array(:,2)**2) /&
+         & pos_array(:,3)))
+    pos_array(:,1)=rad_array(:,1)
+    pos_array(:,2)=rad_array(:,2)
+    pos_array(:,3)=rad_array(:,3)
+
+    if (allocated(rad_array))deallocate(rad_array)
+    call trace_exit("io_cart_to_radial")
+    return 
+  end subroutine io_cart_to_radial
+
+
+  subroutine io_radial_to_cart(pos_array)
+    implicit none
+
+    real(dp),dimension(:,:), intent(inout) :: pos_array
+    real(dp),dimension(:,:),allocatable  :: rad_array 
+    integer  :: stat
+ 
+    call trace_entry("io_radial_to_cart")
+
+
+    allocate(rad_array(1:current_structure%n_bodies,1:3),stat=stat)
+    if (stat.ne.0)call io_errors("Error in I/O: allocate rad_array")
+
+    rad_array(:,1)=pos_array(:,1)*sin(pos_array(:,3))*cos(pos_array(:,2))
+    rad_array(:,2)=pos_array(:,1)*sin(pos_array(:,3))*cos(pos_array(:,2))
+    rad_array(:,3)=pos_array(:,1)*cos(pos_array(:,3))
+
+    pos_array(:,1)=rad_array(:,1)
+    pos_array(:,2)=rad_array(:,2)
+    pos_array(:,3)=rad_array(:,3)
+    
+    if (allocated(rad_array))deallocate(rad_array)
+    call trace_exit("io_radial_to_cart")
+    return
+  end subroutine io_radial_to_cart
+
+
+  
 end module io
+ 
+ 
