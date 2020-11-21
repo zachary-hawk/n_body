@@ -53,6 +53,24 @@ endif
 
 ifeq ($(COMMS_ARCH),serial)
 
+n_body.serial: n_body.o io.o trace.o comms_serial.o
+	$(SERIAL_F90) -o n_body.serial  n_body.o io.o trace.o comms_serial.o $(FCFLAGS)
+# Here are the compile steps
+
+n_body.o:n_body.f90 io.o trace.o comms_serial.o 
+	$(SERIAL_F90) -c  n_body.f90 $(FCFLAGS)
+
+io.o:./io.f90 trace.o comms_serial.o
+	@echo $(OPT)
+	$(SERIAL_F90) -c  ./io.f90 -cpp -D life_dir=$(current_dir) -D opt_strat=$(OPT) $(FCFLAGS)
+
+trace.o:./trace.f90
+	$(SERIAL_F90) -c  ./trace.f90 $(FCFLAGS)
+
+comms_serial.o:./comms_serial.f90 trace.o
+	$(SERIAL_F90) -c  ./comms_serial.f90 $(FCFLAGS)
+
+
 #mc_pop.serial: pop.o io.o trace.o comms_serial.o life.o
 #	$(SERIAL_F90) -o mc_pop.serial  pop.o io.o trace.o comms_serial.o life.o  $(FCFLAGS)
 # Here are the compile steps

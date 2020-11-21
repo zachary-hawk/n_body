@@ -14,7 +14,10 @@ module io
   integer,           public,parameter      :: stdout = 984
   integer,           public,parameter      :: dp = real64
   real,              public,parameter      :: pi=3.1415926535_dp
-  real(dp),          public,parameter      :: G= 6.67430E-11
+
+  real(dp),          public,parameter      :: AU=1.495978707E11
+  real(dp),          public,parameter      :: m_sol = 1.98847E30
+  real(dp),          public,parameter      :: G= m_sol*6.67430E-11/AU**3
   logical,           public                :: file_exists
   logical,           public                :: file_exists_struct
 
@@ -51,8 +54,8 @@ module io
   character(len=30),parameter,public :: key_debug            = "debug"
   character(len=30),parameter,public :: key_dry_run          = "dryrun"
   character(len=30),parameter,public :: key_diff_method      = 'ode_solver'
-  character(len=30),parameter,public ::key_epsilon   = 'pot_soften'
-  character(len=30),parameter,public ::key_write_config   = 'write_output_configuration'
+  character(len=30),parameter,public :: key_epsilon   = 'pot_soften'
+  character(len=30),parameter,public :: key_write_config   = 'write_output_configuration'
   ! %End: keys
 
 
@@ -72,16 +75,17 @@ module io
      real(dp)         ,allocatable,dimension(:)   :: masses        ! Massess of all the particles
      real(dp)         ,allocatable,dimension(:,:) :: init_velocity ! Initial velocities of all particles
      character(len=15),allocatable,dimension(:)   :: labels        ! Labels, can be custom or automatically defined
+     character(len=15)                            :: units = "AU"
      integer                                      :: n_bodies      ! Number of particles, used to define the arrays
-     logical                                      :: init_radial   ! Gives the radial initialisation scheme
-     logical                                      :: init_cart     ! Gives the cartesian initialisation scheme
-     logical                                      :: init_grid     ! Gives the grid initialisation scheme
+     logical                                      :: init_radial=.false.   ! Gives the radial initialisation scheme
+     logical                                      :: init_cart=.false.     ! Gives the cartesian initialisation scheme
+     logical                                      :: init_grid=.false.     ! Gives the grid initialisation scheme
      integer                                      :: nx, ny, nz    ! Grid dimensions for grid initialisation n_bodies=nx*ny*nz
      real(dp)                                     :: dnx,dny,dnz   ! Grid spacings for grid initalisation
-
+     
   end type structure
 
-  
+
   type(parameters),public,save :: current_params
   type(structure),public,save :: current_structure
 
@@ -137,6 +141,9 @@ contains
     end if
     ! Allocate space for the params array
     allocate(present_array(0:max_params))
+    do i=1,max_params
+       write(present_array(i),*)i
+    end do
 
     ! Fist things first, try to read paramteters
     if (read_params) call io_read_param(current_params)
@@ -146,7 +153,12 @@ contains
     inquire(file="struct.n_body",exist=file_exists_struct)
     if (.not.file_exists_struct)call io_errors("Error in I/O: No structure file")
     if (file_exists_struct) call io_read_structure()
+    
 
+!!$    print*,current_structure%positions(1,:)
+!!$    call io_cart_to_radial(current_structure%positions)
+!!$    print*,current_structure%positions(1,:)
+!!$    print*,current_structure%labels(1)
 
     ! Open up the main file for the output
     open(stdout,file="out.n_body",RECL=8192,form="FORMATTED",access="append")
@@ -197,13 +209,14 @@ contains
        if (stat.ne.0) call io_errors("Error in I/O: Open file 'param.n_body'")
        ! now we can do the reading
        k=0
-       do i=0,max_params
+       do i=1,max_params
           !first thing, read new line into 'line' variable
           read(1,'(A)',iostat=read_stat) line
 
-          write(present_array(i),*)i
 
+          !print*,trim(present_array(i))
           ! Check for blank line
+          if (read_stat.ne.0)exit
           if (trim(line).eq."") cycle
 
 
@@ -211,12 +224,11 @@ contains
           call io_freeform_read(line,key,param,comment)
 
           if (comment) cycle ! skip if comment
-
           !Do some trimming
           key=adjustl(trim(io_case(key)))
           param=adjustl(trim(io_case(param)))
 
-
+          !print*,trim(key),i
           ! %Begin: case_read
           select case(key)
           case(key_calc_len)
@@ -235,7 +247,7 @@ contains
              read(param,*,iostat=stat) dummy_params%dry_run
              if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
              present_array(i)=key
-          case(key_diff_method                                                 )
+          case(key_diff_method)
              read(param,*,iostat=stat) dummy_params%diff_method
              if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
              present_array(i)=key
@@ -244,14 +256,15 @@ contains
           end select
 
        end do
-
-
     else
        no_param=.true.
        call trace_exit("io_read_param")
        return
     end if
     ! Check for duplicates
+
+
+    !print*,trim(present_array(i))
     do i=0,max_params
        do j=0,max_params
           if (i.eq.j)cycle
@@ -261,7 +274,7 @@ contains
           end if
        end do
     end do
-
+    close(1)
     call trace_exit("io_read_param")
     return
   end subroutine io_read_param
@@ -312,7 +325,7 @@ contains
        end if
     end do
 
-
+    !print*,line_unparsed,key,val,com
 
     return
   end subroutine io_freeform_read
@@ -412,7 +425,45 @@ contains
 
     logical          ::   search = .false.
     logical          ::   help   = .false.
+    integer::file
+    integer :: maj_mpi,min_mpi,min_char
+    character(len=max_version_length) :: mpi_c_version
+    character(len=3) :: MPI_version_num
+    character(len=100):: compile_version,cpuinfo
+    character(len=5) :: opt
+
     nargs=command_argument_count()
+
+
+
+
+    if (comms_arch.eq."MPI")then
+       call COMMS_LIBRARY_VERSION(mpi_c_version)
+       call COMMS_VERSION(min_mpi,maj_mpi)
+
+       write(mpi_version_num,97)min_mpi,maj_mpi
+97     format(i1,"."i1)
+       min_char=scan(mpi_c_version,".")
+       !print*, mpi_c_version,mpi_version_num
+    end if
+
+#ifdef __INTEL_COMPILER
+#define compiler "Intel Compiler"
+
+#endif
+#ifdef __GFORTRAN__
+#define compiler "GNU Fortran"
+    !#define compile_version __VERSION__
+#endif
+
+#define opt opt_strat
+    compile_version=compiler_version()
+    if (compiler.eq."Intel Compiler")then
+       compile_version=compiler_version()
+
+       compile_version=trim(compile_version(87:97))
+    end if
+
 
     if (nargs.gt.0)then
        do arg_index=1,nargs
@@ -438,6 +489,13 @@ contains
           case("-v")
              write(*,*) trim(version)
              write(*,*) trim(info)
+             write(*,*) "Compiled with ",compiler," ",Trim(compile_version), " on ", __DATE__, " at ",__TIME__
+             write(*,*) "Communications architechture: ",comms_arch
+             if (comms_arch.eq."MPI")then
+                write(*,*) "MPI Version: ",mpi_c_version(1:min_char+1)
+             end if
+             write(*,*) "Optimisation Strategy: ",opt
+             write(*,*)
              read_params=.false.
              stop
           case("-d","--dryrun")
@@ -662,7 +720,7 @@ contains
     character(len=max_version_length) :: mpi_c_version
     character(len=3) :: MPI_version_num
     character(len=100):: compile_version,cpuinfo
-    character(len=5) :: opt
+
 
     call trace_entry("io_header")
 
@@ -913,14 +971,33 @@ contains
   subroutine io_read_structure()
     implicit none
     integer :: n
-    integer :: stat
-
-    character(len=100) :: line
-
+    integer :: stat=0
+    character(len=60) :: line        ! charcter string into which each line is read, overwritten in loop
+    character(len=30) :: key         ! the keyword used
+    character(len=30) :: param       ! the value of the param
+    logical           :: comment     ! boolean for comment line, will skip 
     call trace_entry("io_read_structure")
 
+    ! Let's open the file
+    open(unit=1,file="struct.n_body",access="STREAM",form="FORMATTED")
     
+    !Start reading
+    do while (stat.eq.0)
 
+       read(1,'(a)',iostat=stat) line
+       if (line(1:1).eq."!" .or. line(1:1).eq."#") cycle
+       line=io_case(line)
+
+       if (index(line,"%block").ne.0) then
+          call io_block_parse(line,stat)
+       else
+          call io_freeform_read(line,key,param,comment)
+       end if
+
+
+
+
+    end do
 
     call trace_exit("io_read_structure")
     return
@@ -949,9 +1026,9 @@ contains
     rad_array(:,3)=atan(sqrt((pos_array(:,1)**2 &
          & + pos_array(:,2)**2) /&
          & pos_array(:,3)))
-    pos_array(:,1)=rad_array(:,1)
-    pos_array(:,2)=rad_array(:,2)
-    pos_array(:,3)=rad_array(:,3)
+    pos_array(:,1)=180.0_dp*rad_array(:,1)/pi
+    pos_array(:,2)=180.0_dp*rad_array(:,2)/pi
+    pos_array(:,3)=180.0_dp*rad_array(:,3)/pi
 
     if (allocated(rad_array))deallocate(rad_array)
     call trace_exit("io_cart_to_radial")
@@ -968,10 +1045,13 @@ contains
 
     call trace_entry("io_radial_to_cart")
 
-
     allocate(rad_array(1:current_structure%n_bodies,1:3),stat=stat)
     if (stat.ne.0)call io_errors("Error in I/O: allocate rad_array")
 
+    pos_array(:,1)=pi*pos_array(:,1)/180.0_dp
+    pos_array(:,2)=pi*pos_array(:,2)/180.0_dp
+    pos_array(:,3)=pi*pos_array(:,3)/180.0_dp
+    
     rad_array(:,1)=pos_array(:,1)*sin(pos_array(:,3))*cos(pos_array(:,2))
     rad_array(:,2)=pos_array(:,1)*sin(pos_array(:,3))*cos(pos_array(:,2))
     rad_array(:,3)=pos_array(:,1)*cos(pos_array(:,3))
@@ -986,7 +1066,82 @@ contains
   end subroutine io_radial_to_cart
 
 
+  subroutine io_block_parse(line,stat)
+    implicit none
+    character(*), intent(in) :: line
+    integer ,intent(inout) ::stat 
+    character(len=6) :: block_str
+    character(len=20):: block_type1,block_type2
+    character(len=60):: buff
+    integer :: in_stat, i, j, k ,n=0
+    logical :: block_closed
+    call trace_entry("io_block_parse")
+    read(line,*,iostat=in_stat) block_str,block_type1
+    if (in_stat.ne.0) call io_errors("Error in I/O: problem parsing %BLOCK")
+    do
+       read(1,'(a)',iostat=stat)buff
+       buff=io_case(buff)
+       if (index(buff,"%endblock").ne.0)then
+          ! check to see if the blocks match
+          read(buff,*,iostat=in_stat) block_str,block_type2
+          if (in_stat.ne.0) call io_errors("Error in I/O: problem parsing %ENDBLOCK")
+          if (trim(block_type1).ne.trim(block_type2))call io_errors("Error in I/O: %BLOCK "//trim(block_type1)//" not closed" )
+          exit
+       else
+          n=n+1
+       end if
+       if (stat.ne.0)call io_errors("Error in I/O: error parsing 'struct.n_body'")
+    end do
 
+
+    !so now we have read the block and got n_bodies, go back and read again
+    current_structure%n_bodies=n
+    ! allocate the stuff
+    allocate(current_structure%positions(1:n,1:3),stat=stat)
+    if (stat.ne.0)call io_errors("Error in I/O: allocate current_structure%positions")
+    allocate(current_structure%init_velocity(1:n,1:3),stat=stat)
+    if (stat.ne.0)call io_errors("Error in I/O: allocate current_structure%init_velocity")
+    allocate(current_structure%masses(1:n),stat=stat)
+    if (stat.ne.0)call io_errors("Error in I/O: allocate current_structure%masses")
+    allocate(current_structure%labels(1:n),stat=stat)
+    if (stat.ne.0)call io_errors("Error in I/O: allocate current_structure%labels")
+
+    do i=1,n+1
+       backspace(1)
+    end do
+
+    do i=1,n
+       read(1,*,iostat=stat) current_structure%labels(i),&
+            & current_structure%masses(i),&
+            & current_structure%positions(i,1), &
+            & current_structure%positions(i,2), &
+            & current_structure%positions(i,3), &
+            & current_structure%init_velocity(i,1),&
+            & current_structure%init_velocity(i,2),&
+            & current_structure%init_velocity(i,3) 
+            !write(current_structure%labels(i),'(a,i3)')"Object ",i
+          if (stat.ne.0) call io_errors("Error in I/O: read structure block")
+    end do
+    read(1,*)buff
+
+
+    ! now lets check if we need to convert.
+    select case(block_type1)
+    case("positions_cart")
+       current_structure%init_cart=.true.
+    case("positions_radial")
+       current_structure%init_radial=.true.
+       call io_cart_to_radial(current_structure%positions)
+       call io_cart_to_radial(current_structure%init_velocity)
+    case default 
+       call io_errors("Error in I/O: Unknown BLOCK type "// block_type1)
+    end select
+
+    
+
+    call trace_exit("io_block_parse")
+    return
+  end subroutine io_block_parse
 
 
 

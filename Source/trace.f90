@@ -85,7 +85,7 @@ contains
     character(*), intent(in)  :: sub_name
     character(30)                    :: new_sub_name
     real                      :: time
-    
+
     new_sub_name=trace_string_to_lower(sub_name)
 
     !print*,"entry start"
@@ -97,7 +97,7 @@ contains
     !set the things to the last array element
 
 
-    
+
     entry_array(size(entry_array))=trim(new_sub_name)
     parent_array(size(parent_array))=parent_counter
     entry_time_array(size(entry_time_array))=time
@@ -166,14 +166,14 @@ contains
     temp_char_array(1:size(exit_array))=exit_array
     call  move_alloc(temp_char_array,exit_array)
 
-    
+
     if (allocated(temp_real_array)) deallocate(temp_real_array)
     if (allocated(temp_char_array)) deallocate(temp_char_array)
 
 
     !decrease the parent counter
     parent_counter=parent_counter-1
- 
+
     !print*,"exit end"
   end subroutine trace_exit
 
@@ -203,7 +203,7 @@ contains
     integer,intent(inout)            :: rank
 
     logical, optional                :: check_stack
-    
+
     ! TRIM DOWN THE ARRAYS
     !print*,"finalise start"
     !!print*,entry_array
@@ -212,18 +212,18 @@ contains
     !!print*,parent_array
 
 
-     !allocate(temp_real_array(1:size(entry_time_array)-1))
-     !temp_real_array(1:size(entry_time_array))=entry_time_array
-     !call  move_alloc(temp_real_array,entry_time_array)
+    !allocate(temp_real_array(1:size(entry_time_array)-1))
+    !temp_real_array(1:size(entry_time_array))=entry_time_array
+    !call  move_alloc(temp_real_array,entry_time_array)
 
- 
- 
+
+
 
     ! allocate(temp_char_array(1:size(entry_array)-1))
     ! temp_char_array(1:size(entry_array))=entry_array
     ! call  move_alloc(temp_char_array,entry_array)
 
-    
+
 
     !allocate(temp_real_array(1:size(exit_time_array)-1))
     !temp_real_array(1:size(exit_time_array))=exit_time_array
@@ -269,13 +269,13 @@ contains
 
     allocate(unique_subs_trimmed(1:no_subs))
     unique_subs_trimmed=unique_array(1:no_subs)
-    
+
 
     if (.not.present(check_stack))then
        if (size(entry_array).ne.size(exit_array)) then
-       write(*,*) "Error: trace array mismatch"
-       stop
-    end if
+          write(*,*) "Error: trace array mismatch"
+          stop
+       end if
     end if
     do i=1,size(unique_subs_trimmed)
        do k=1,size(entry_array)
@@ -294,7 +294,7 @@ contains
 
     call trace_sort(sub_times,unique_subs_trimmed,call_count)
     !print*,"test"
-    
+
 
     if(debug)call trace_IO(rank,unique_subs_trimmed,sub_times,call_count)
 
@@ -332,12 +332,12 @@ contains
     character(len=50),dimension(:),intent(inout) :: out_array
     integer,intent(out)                          :: k                   ! The number of unique elements
     integer :: i, j, stat
-    
+
     !print*,"unique start"
-    
+
     allocate(res(size(unsorted_array)-1))
 
-       
+
     k = 1
     res(1) = unsorted_array(1)
     outer: do i=2,size(unsorted_array)-1
@@ -383,7 +383,7 @@ contains
     allocate(temp_array(1:size(array_to_sort)))
     allocate(temp_array_char(1:size(array_to_sort)))
     allocate(temp_count(1:size(count_array)))
-    
+
 
     do j=1,size(array_to_sort)-1
        do i=1,size(array_to_sort)-j
@@ -434,7 +434,7 @@ contains
     integer                    :: k 
     integer::length
     !print*,"string start"
-!    call trace_entry("IO_STRING_TO_LOWER")
+    !    call trace_entry("IO_STRING_TO_LOWER")
     length = len(string)
     new    = string
     do i = 1,len(string)
@@ -447,8 +447,8 @@ contains
     !    call trace_exit("IO_STRING_TO_LOWER")
     !print*,"string end"
   end function trace_string_to_lower
-  
-  
+
+
   subroutine trace_IO(rank,subs_list,time_list,call_list)
     !==============================================================================!
     !                               T R A C E _ I O                                !
@@ -603,7 +603,7 @@ contains
     !print*,"stack end"
   end subroutine trace_stack
 
-  
+
   subroutine trace_parents(file_id)
     !==============================================================================!
     !                          T R A C E _ P A R E N T S                           !
@@ -628,15 +628,15 @@ contains
     write(file_id,'(" |",T8,A,T87,A,T97,"|")')"Call Log:","Time:"
     write(file_id,*) "+==============================================================================================+"
 
-    
-    
-    
+
+
+
     do i=1,size(parent_array)-1
 
        temp_int=2*parent_array(i)
        width=82-4-temp_int-3-1-len(entry_array(i))-10
        width2=82-4-temp_int 
-      
+
        ! Set up the characters that start the line
        if (temp_int.eq.0)then
           !skip
@@ -647,10 +647,10 @@ contains
           write(back,*) (" |",k=1,temp_int/2),"\ "
           write(point,*) ("| ", k=1,temp_int/2),"o->"
           write(forward,*) (" |",k=1,temp_int/2),"/ "
-          
+
        end if
 
-       
+
        if (temp_int.eq.0)then
           write(fmt_str,*) '(1x,"|",3x,A,1x,A,T83,f10.5,x,"s",T97,"|")'
           write(fmt_str2,*) '(1x,"|",2x,A,T97,"|")'
@@ -673,7 +673,7 @@ contains
             then
           write(file_id,trim(fmt_str2)) trim(forward)!"/"
        end if
-       
+
     end do
 
 
