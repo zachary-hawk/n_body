@@ -45,6 +45,8 @@ module io
      character(len=30) :: diff_method = 'euler'
      real(dp) :: epsilon =    0.0000000000000000
      logical :: write_config = .true.
+     logical :: write_fmt = .false.
+     character(len=30) :: units = 'AU                            '
      ! %End: parameters
   end type parameters
 
@@ -56,6 +58,8 @@ module io
   character(len=30),parameter,public :: key_diff_method      = 'ode_solver'
   character(len=30),parameter,public :: key_epsilon   = 'pot_soften'
   character(len=30),parameter,public :: key_write_config   = 'write_output_configuration'
+  character(len=30),parameter,public ::key_write_fmt   = 'write_formatted_positions'
+  character(len=30),parameter,public ::key_units   = 'units'
   ! %End: keys
 
 
@@ -63,9 +67,7 @@ module io
      real(dp)  :: birth_rate
 
   end type results
-
-
-  integer,parameter::max_keys=           7
+  integer,parameter::max_keys=           9
   ! %End: max_param
 
 
@@ -82,7 +84,7 @@ module io
      logical                                      :: init_grid=.false.     ! Gives the grid initialisation scheme
      integer                                      :: nx, ny, nz    ! Grid dimensions for grid initialisation n_bodies=nx*ny*nz
      real(dp)                                     :: dnx,dny,dnz   ! Grid spacings for grid initalisation
-     
+
   end type structure
 
 
@@ -153,7 +155,7 @@ contains
     inquire(file="struct.n_body",exist=file_exists_struct)
     if (.not.file_exists_struct)call io_errors("Error in I/O: No structure file")
     if (file_exists_struct) call io_read_structure()
-    
+
 
 !!$    print*,current_structure%positions(1,:)
 !!$    call io_cart_to_radial(current_structure%positions)
@@ -161,7 +163,7 @@ contains
 !!$    print*,current_structure%labels(1)
 
     ! Open up the main file for the output
-    open(stdout,file="out.n_body",RECL=8192,form="FORMATTED",access="append")
+    open(stdout,file="out.n_body",RECL=8192,form="FORMATTED")
 
 
     call io_header()
@@ -647,6 +649,8 @@ contains
     keys_array(5)=trim(key_diff_method)
     keys_array(6)=trim(key_epsilon)
     keys_array(7)=trim(key_write_config)
+    keys_array(8)=trim(key_write_fmt)
+    keys_array(9)=trim(key_units)
     ! %End: assign_keys
 
     ! %Begin: assign_default
@@ -662,8 +666,12 @@ contains
     keys_default(5)=trim(adjustl(junk))
     write(junk,*)current_params%epsilon
     keys_default(6)=trim(adjustl(junk))
-    write(junk,*)current_params%write_config                                                
+    write(junk,*)current_params%write_config
     keys_default(7)=trim(adjustl(junk))
+    write(junk,*)current_params%write_fmt
+    keys_default(8)=trim(adjustl(junk))
+    write(junk,*)current_params%units                                                       
+    keys_default(9)=trim(adjustl(junk))
     ! %End: assign_default
 
     ! %Begin: assign_description
@@ -674,6 +682,8 @@ contains
     keys_description(5)='Chose method for solving ODEs.'
     keys_description(6)='Amount of softening used in the gravitational potential to avoid singularities'
     keys_description(7)='Specify whether or not to write final configuration into STRUCT file format.'
+    keys_description(8)='Specify wheather to write a formatted file with the position history of the objects.'
+    keys_description(9)='Specify the unit system for input values.'
     ! %End: assign_description
 
     ! %Begin: assign_allowed
@@ -684,6 +694,8 @@ contains
     keys_allowed(5)='euler'
     keys_allowed(6)='(any real) > 0'
     keys_allowed(7)='Boolean'
+    keys_allowed(8)='Boolean'
+    keys_allowed(9)='AU'
     ! %End: assign_allowed
 
     ! do the loop for printing stuff
@@ -842,7 +854,7 @@ contains
     !==============================================================================!
     implicit none
     character(50)   :: sec_title
-    integer         :: width=97,length
+    integer         :: width=97,length,i
     ! Stuff for getting run time
     character(len=3),dimension(12)  :: months
     integer                         :: d_t(8)
@@ -866,8 +878,6 @@ contains
 14  format(1x,A,T44,":",5x,ES12.2,1x,A)  !Science
 
 
-
-
     ! Do some printing about the parameters file
 
     if (file_exists)then
@@ -875,6 +885,27 @@ contains
     else
        write(stdout,*)"Parameters file not found, using defaults"
     end if
+
+
+
+
+    sec_title="Initial Configuration"
+    length=len(trim(sec_title))
+    write(stdout,*)repeat("-",(width-length)/2-2)//"  "//trim(sec_title)//" "//repeat("-",(width-length)/2-2)
+
+    write(stdout,*)
+    write(stdout,16) "Label","Mass (Mo)","Position (AU)", "Velocity (AU/s)"
+    write(stdout,*) repeat("-",width-1)
+    do i=1,current_structure%n_bodies     
+       write(stdout,15) current_structure%labels(i),current_structure%masses(i),current_structure%positions(i,1),&
+            & current_structure%positions(i,2),current_structure%positions(i,3),&
+            & current_structure%init_velocity(i,1),current_structure%init_velocity(i,2),&
+            & current_structure%init_velocity(i,3)
+    end do
+
+15  format(1x,A,T15,ES11.4,T30,3(f9.4,1x),3x,3(ES11.4,1x))
+16  format(2x,A,T17,A,T39,A,T72,A)
+
 
 
     call trace_exit("io_write_params")
@@ -891,17 +922,16 @@ contains
     logical               :: survived
 
     character(50)   :: sec_title
-    integer         :: width=97,length
+    integer         :: width=97,length,i
     ! Stuff for getting run time
     character(len=3),dimension(12)  :: months
     integer                         :: d_t(8)
     character*10                    :: b(3)
     call trace_entry("io_write_results")
 
-10  format(1x,A,T44,':',5x,I9,1x,A)    !integer
-11  format(1x,A,T44,":",5x,f9.2,1x,A)  !real
-12  format(1x,A,T44,":",5x,L9,1x,A)    !logical
-
+10  format(1x,A,T50,':',5x,I9,1x,A)    !integer
+11  format(1x,A,T50,":",5x,f9.2,1x,A)  !real
+12  format(1x,A,T50,":",5x,L9,1x,A)    !logical
 
 
     call date_and_time(b(1), b(2), b(3), d_t)
@@ -975,12 +1005,12 @@ contains
     character(len=60) :: line        ! charcter string into which each line is read, overwritten in loop
     character(len=30) :: key         ! the keyword used
     character(len=30) :: param       ! the value of the param
-    logical           :: comment     ! boolean for comment line, will skip 
+    logical           :: comment     ! boolean for comment line, will skip
     call trace_entry("io_read_structure")
 
     ! Let's open the file
     open(unit=1,file="struct.n_body",access="STREAM",form="FORMATTED")
-    
+
     !Start reading
     do while (stat.eq.0)
 
@@ -1051,7 +1081,7 @@ contains
     pos_array(:,1)=pi*pos_array(:,1)/180.0_dp
     pos_array(:,2)=pi*pos_array(:,2)/180.0_dp
     pos_array(:,3)=pi*pos_array(:,3)/180.0_dp
-    
+
     rad_array(:,1)=pos_array(:,1)*sin(pos_array(:,3))*cos(pos_array(:,2))
     rad_array(:,2)=pos_array(:,1)*sin(pos_array(:,3))*cos(pos_array(:,2))
     rad_array(:,3)=pos_array(:,1)*cos(pos_array(:,3))
@@ -1069,7 +1099,7 @@ contains
   subroutine io_block_parse(line,stat)
     implicit none
     character(*), intent(in) :: line
-    integer ,intent(inout) ::stat 
+    integer ,intent(inout) ::stat
     character(len=6) :: block_str
     character(len=20):: block_type1,block_type2
     character(len=60):: buff
@@ -1118,9 +1148,9 @@ contains
             & current_structure%positions(i,3), &
             & current_structure%init_velocity(i,1),&
             & current_structure%init_velocity(i,2),&
-            & current_structure%init_velocity(i,3) 
-            !write(current_structure%labels(i),'(a,i3)')"Object ",i
-          if (stat.ne.0) call io_errors("Error in I/O: read structure block")
+            & current_structure%init_velocity(i,3)
+       !write(current_structure%labels(i),'(a,i3)')"Object ",i
+       if (stat.ne.0) call io_errors("Error in I/O: read structure block")
     end do
     read(1,*)buff
 
@@ -1133,11 +1163,11 @@ contains
        current_structure%init_radial=.true.
        call io_cart_to_radial(current_structure%positions)
        call io_cart_to_radial(current_structure%init_velocity)
-    case default 
+    case default
        call io_errors("Error in I/O: Unknown BLOCK type "// block_type1)
     end select
 
-    
+
 
     call trace_exit("io_block_parse")
     return
@@ -1147,6 +1177,8 @@ contains
 
 
 end module io
+ 
+ 
  
  
  

@@ -11,6 +11,11 @@ program n_body
   call comms_init()
 
   call io_initialise()
+
+  ! After the io_initialise call, the number of objects has been settled we can now work out the 
+
+
+
   if (on_root_node)then
      call io_write_params()
 
