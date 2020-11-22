@@ -155,7 +155,7 @@ contains
     inquire(file="struct.n_body",exist=file_exists_struct)
     if (.not.file_exists_struct)call io_errors("Error in I/O: No structure file")
     if (file_exists_struct) call io_read_structure()
-
+    !if (current_structure%n_bodies.eq.0)call io_errors("Error in I/O: No objects found")
 
 !!$    print*,current_structure%positions(1,:)
 !!$    call io_cart_to_radial(current_structure%positions)
