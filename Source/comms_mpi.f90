@@ -1,4 +1,4 @@
-!---- File documented by Fortran Documenter, Z.Hawkhead
+!---- File documented by ForOAAtran Documenter, Z.Hawkhead
 !=============================================================================!
 !                                  COMMS                                      !
 !=============================================================================!
@@ -8,20 +8,21 @@
 !=============================================================================! 
 module COMMS
   !use mpi
+  use iso_fortran_env , only : real64
   use trace
   implicit none
   include 'mpif.h'
   integer                              :: ierr
   integer,parameter                    :: max_version_length=MPI_MAX_LIBRARY_VERSION_STRING
   integer, dimension(MPI_STATUS_SIZE)  :: status1
-
+  integer,parameter,private :: dp=real64
   ! Some of the stuff i'll need, gloabal
   integer,public,save                  :: rank
   integer,public,save                  :: nprocs
   logical,public,save                  :: on_root_node
   
   character(3)                         :: comms_arch="MPI"
-
+  integer,public,save,dimension(:,:),allocatable :: comms_scheme_array
 
 
 
@@ -329,7 +330,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer:: count,dest_rank,tag
-    double precision :: send_buff
+    real(dp):: send_buff
     call trace_entry("COMMS_SEND_DOUBLE")
     call MPI_SEND(send_buff,count,MPI_DOUBLE,dest_rank,tag,MPI_COMM_WORLD,ierr)
     call trace_exit("COMMS_SEND_DOUBLE")
@@ -394,7 +395,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer:: count,dest_rank,tag
-    double precision,dimension(count) :: send_buff
+    real(dp),dimension(count) :: send_buff
     call trace_entry("COMMS_SEND_DOUBLE_ARRAY")
     call MPI_SEND(send_buff,count,MPI_DOUBLE,dest_rank,tag,MPI_COMM_WORLD,ierr)
     call trace_exit("COMMS_SEND_DOUBLE_ARRAY")
@@ -517,7 +518,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer:: count,source,tag
-    double precision ,intent(inout) :: recv_buff
+    real(dp),intent(inout) :: recv_buff
     call trace_entry("COMMS_RECV_DOUBLE")
     call MPI_RECV(recv_buff,count,MPI_DOUBLE,source,tag,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_RECV_DOUBLE")
@@ -582,7 +583,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer :: count,source,tag
-    double precision,dimension(count),intent(inout) :: recv_buff
+    real(dp),dimension(count),intent(inout) :: recv_buff
     call trace_entry("COMMS_RECV_DOUBLE_ARRAY")
     call MPI_RECV(recv_buff,count,MPI_DOUBLE,source,tag,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_RECV_DOUBLE_ARRAY")
@@ -685,7 +686,7 @@ contains
     !==============================================================================!
     !                    C O M M S _ R E D U C E _ D O U B L E                     !
     !==============================================================================!
-    ! Subroutine wrapper for reducing double precision data from all processes     !
+    ! Subroutine wrapper for reducing real(dp) data from all processes     !
     ! to the root.                                                                 !
     !------------------------------------------------------------------------------!
     ! Arguments:                                                                   !
@@ -697,8 +698,8 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer:: count
-    double precision,intent(inout) :: recv_buff
-    double precision :: send_buff
+    real(dp),intent(inout) :: recv_buff
+    real(dp):: send_buff
     character(*) :: OP
 
     call trace_entry("COMMS_REDUCE_DOUBLE")
@@ -784,7 +785,7 @@ contains
     !==============================================================================!
     !              C O M M S _ R E D U C E _ D O U B L E _ A R R A Y               !
     !==============================================================================!
-    ! Subroutine wrapper for reducing double precision arrays from all             !
+    ! Subroutine wrapper for reducing real(dp) arrays from all             !
     ! proccesses to the root.                                                      !
     !------------------------------------------------------------------------------!
     ! Arguments:                                                                   !
@@ -796,9 +797,10 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer:: count
-    double precision,dimension(count),intent(inout) :: recv_buff
-    double precision,dimension(count) :: send_buff
+    real(dp),dimension(count),intent(inout) :: recv_buff
+    real(dp),dimension(count) :: send_buff
     character(*) :: OP
+!    print*,rank, "before"
     call trace_entry("COMMS_REDUCE_DOUBLE_ARRAY")
     if (trim(OP).eq."MPI_MAX")then
        call MPI_REDUCE(send_buff,recv_buff,count,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD,status1,ierr)
@@ -807,6 +809,7 @@ contains
     elseif (trim(OP).eq."MPI_SUM")then
        call MPI_REDUCE(send_buff,recv_buff,count,MPI_DOUBLE,MPI_SUM,0,MPI_COMM_WORLD,status1,ierr)
     end if
+!    print*, rank,"after"
     call trace_exit("COMMS_REDUCE_DOUBLE_ARRAY")
   end subroutine COMMS_REDUCE_DOUBLE_ARRAY
 
@@ -896,7 +899,7 @@ contains
     !==============================================================================!
     !                     C O M M S _ B C A S T _ D O U B L E                      !
     !==============================================================================!
-    ! Subroutine wrapper for broadcasting double precision data from the root to   !
+    ! Subroutine wrapper for broadcasting real(dp)data from the root to   !
     ! all children processes.                                                      !
     !------------------------------------------------------------------------------!
     ! Arguments:                                                                   !
@@ -906,10 +909,11 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer :: count
-    double precision :: start_buff
+    real(dp):: start_buff
     call trace_entry("COMMS_BCAST_DOUBLE")
     call MPI_BCAST(start_buff, count,MPI_DOUBLE,0,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_BCAST_DOUBLE")
+
   end subroutine COMMS_BCAST_DOUBLE
   !ARRAY
   subroutine COMMS_BCAST_INT_ARRAY(start_buff,count)
@@ -954,7 +958,7 @@ contains
     !==============================================================================!
     !               C O M M S _ B C A S T _ D O U B L E _ A R R A Y                !
     !==============================================================================!
-    ! Subroutine wrapper for broadcasting array of double precision data from      !
+    ! Subroutine wrapper for broadcasting array of real(dp) data from      !
     ! the root to all children processes.                                          !
     !------------------------------------------------------------------------------!
     ! Arguments:                                                                   !
@@ -964,7 +968,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer :: count
-    double precision,dimension(count) :: start_buff
+    real(dp),dimension(count) :: start_buff
     call trace_entry("COMMS_BCAST_DOUBLE_ARRAY")
     call MPI_BCAST(start_buff, count,MPI_DOUBLE,0,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_BCAST_DOUBLE_ARRAY")
@@ -987,10 +991,92 @@ contains
     !------------------------------------------------------------------------------!
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
-    double precision :: time
+    real(dp):: time
 !    call trace_entry("COMMS_WTIME")
     time = MPI_WTIME()
 !    call trace_exit("COMMS_WTIME")
   end function COMMS_WTIME
 
+
+
+  subroutine COMMS_SCHEME(N)
+    implicit none
+    integer,intent(in) :: N
+    integer :: n_par,U_par
+    integer, dimension(:),allocatable :: split
+    integer :: i,j,k
+
+    call trace_entry("comms_scheme")
+
+    ! allocate the scheme array
+    if (nprocs.eq.1)then
+       allocate(comms_scheme_array(0:nprocs,1:4))
+    else
+       allocate(comms_scheme_array(0:nprocs-1,1:4))
+    end if
+
+    if (nprocs.lt.N)then
+       allocate(split(1:nprocs))
+
+       split(:)=0
+       do i =1,N-nprocs
+          if (i.gt.size(split))exit
+          split(i)=split(i)+1
+       end do
+       comms_scheme_array(0,1)=1
+       comms_scheme_array(0,2)=comms_scheme_array(0,1)+split(1)
+       do i = 1,nprocs-1
+          if (i.gt.nprocs-1) exit
+          comms_scheme_array(i,1)=comms_scheme_array(i-1,2)+1
+          if (i.ne.nprocs-1)then
+             comms_scheme_array(i,2)=comms_scheme_array(i,1)+split(i+1)          
+          else
+             comms_scheme_array(i,2)=N
+          end if
+          end do
+       comms_scheme_array(:,3)=1
+       comms_scheme_array(:,4)=N
+    else if (nprocs.eq.1)then
+       comms_scheme_array(0,1)=1
+       comms_scheme_array(0,2)=1
+       comms_scheme_array(0,3)=1
+       comms_scheme_array(0,4)=N
+       
+    else
+
+       allocate(split(1:N))
+       split(:)=1
+       do i =1,-N+nprocs
+         
+          if (i.gt.size(split))exit
+          split(i)=split(i)+1
+       end do
+
+       k=0
+       do i=1,N
+          if (i.gt.size(split))exit
+          do j=1,split(i)
+             comms_scheme_array(k,1)=i
+             comms_scheme_array(k,2)=i
+             comms_scheme_array(k,3)=(j-1)*(N)/split(i) +1              
+             if (j.ne.split(i))then
+                comms_scheme_array(k,4)=j*(N)/split(i)
+             else
+                comms_scheme_array(k,4)=N
+             end  if
+             k=k+1
+          end do
+       end do
+    end if
+    
+!!$    do i = 0,nprocs-1
+!!$       if (on_root_node)print*,comms_scheme_array(i,:)
+!!$    end do
+!!$    
+
+    call trace_exit("comms_scheme")
+    return
+  end subroutine COMMS_SCHEME
+
+  
 end module COMMS

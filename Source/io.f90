@@ -14,10 +14,12 @@ module io
   integer,           public,parameter      :: stdout = 984
   integer,           public,parameter      :: dp = real64
   real,              public,parameter      :: pi=3.1415926535_dp
-
+  real(dp),          public,parameter      :: small_number= 1e-15
+  real(dp),          public,parameter      :: G = 6.67430E-11
   real(dp),          public,parameter      :: AU=1.495978707E11
   real(dp),          public,parameter      :: m_sol = 1.98847E30
-  real(dp),          public,parameter      :: G= m_sol*6.67430E-11/AU**3
+  real(dp),          public,parameter      :: days = 3600.0_dp*24.0_dp
+  real(dp),          public,parameter      :: G_AU= 2.959255024E-4
   logical,           public                :: file_exists
   logical,           public                :: file_exists_struct
 
@@ -58,8 +60,8 @@ module io
   character(len=30),parameter,public :: key_diff_method      = 'ode_solver'
   character(len=30),parameter,public :: key_epsilon   = 'pot_soften'
   character(len=30),parameter,public :: key_write_config   = 'write_output_configuration'
-  character(len=30),parameter,public ::key_write_fmt   = 'write_formatted_positions'
-  character(len=30),parameter,public ::key_units   = 'units'
+  character(len=30),parameter,public :: key_write_fmt   = 'write_formatted_positions'
+  character(len=30),parameter,public :: key_units   = 'units'
   ! %End: keys
 
 
@@ -84,7 +86,7 @@ module io
      logical                                      :: init_grid=.false.     ! Gives the grid initialisation scheme
      integer                                      :: nx, ny, nz    ! Grid dimensions for grid initialisation n_bodies=nx*ny*nz
      real(dp)                                     :: dnx,dny,dnz   ! Grid spacings for grid initalisation
-
+     real(dp)                                     :: tot_energy 
   end type structure
 
 
@@ -151,19 +153,21 @@ contains
     if (read_params) call io_read_param(current_params)
 
 
+    ! Now we do sensible defaults
+    
+
+    
     ! Try and open the struct file
     inquire(file="struct.n_body",exist=file_exists_struct)
     if (.not.file_exists_struct)call io_errors("Error in I/O: No structure file")
     if (file_exists_struct) call io_read_structure()
-    !if (current_structure%n_bodies.eq.0)call io_errors("Error in I/O: No objects found")
+    if (nprocs.gt.current_structure%n_bodies**2)call io_errors("Error in I/O: MPI load balance")
 
-!!$    print*,current_structure%positions(1,:)
-!!$    call io_cart_to_radial(current_structure%positions)
-!!$    print*,current_structure%positions(1,:)
-!!$    print*,current_structure%labels(1)
+    ! Now we've read the sructure, check for nprocs
 
+    
     ! Open up the main file for the output
-    open(stdout,file="out.n_body",RECL=8192,form="FORMATTED")
+    open(stdout,file="out.n_body",RECL=8192,form="FORMATTED",encoding='utf-8')
 
 
     call io_header()
@@ -682,7 +686,7 @@ contains
     keys_description(5)='Chose method for solving ODEs.'
     keys_description(6)='Amount of softening used in the gravitational potential to avoid singularities'
     keys_description(7)='Specify whether or not to write final configuration into STRUCT file format.'
-    keys_description(8)='Specify wheather to write a formatted file with the position history of the objects.'
+    keys_description(8)='Specify whether to write a formatted file with the position history of the objects.'
     keys_description(9)='Specify the unit system for input values.'
     ! %End: assign_description
 
@@ -859,8 +863,9 @@ contains
     character(len=3),dimension(12)  :: months
     integer                         :: d_t(8)
     character*10                    :: b(3)
-
-
+    integer, parameter :: ui = selected_char_kind('ISO_10646')
+    character(kind=ui, len=:), allocatable :: string
+    
     call trace_entry("io_write_params")
 
     call date_and_time(b(1), b(2), b(3), d_t)
@@ -885,16 +890,17 @@ contains
     else
        write(stdout,*)"Parameters file not found, using defaults"
     end if
-
-
-
+    write(stdout,*)
+    
+    string=ui_'Mass (M \u2609)'
+    string="Mass (M0)"
 
     sec_title="Initial Configuration"
     length=len(trim(sec_title))
     write(stdout,*)repeat("-",(width-length)/2-2)//"  "//trim(sec_title)//" "//repeat("-",(width-length)/2-2)
 
     write(stdout,*)
-    write(stdout,16) "Label","Mass (Mo)","Position (AU)", "Velocity (AU/s)"
+    write(stdout,16) "Label",string,"Position (AU)", "Velocity (AU/day)"
     write(stdout,*) repeat("-",width-1)
     do i=1,current_structure%n_bodies     
        write(stdout,15) current_structure%labels(i),current_structure%masses(i),current_structure%positions(i,1),&
@@ -903,7 +909,7 @@ contains
             & current_structure%init_velocity(i,3)
     end do
 
-15  format(1x,A,T15,ES11.4,T30,3(f9.4,1x),3x,3(ES11.4,1x))
+15  format(1x,A,T15,ES11.4,T30,3(f9.6,1x),3x,3(ES11.4,1x))
 16  format(2x,A,T17,A,T39,A,T72,A)
 
 
@@ -1040,23 +1046,35 @@ contains
 
     real(dp),dimension(:,:), intent(inout) :: pos_array
     real(dp),dimension(:,:),allocatable  :: rad_array
-    integer  :: stat
+    integer  :: stat,i
 
     call trace_entry("io_cart_to_radial")
 
 
     allocate(rad_array(1:current_structure%n_bodies,1:3),stat=stat)
     if (stat.ne.0)call io_errors("Error in I/O: allocate rad_array")
+    do i = 1,current_structure%n_bodies
+       rad_array(i,1)=sqrt(pos_array(i,1)**2 &
+            & + pos_array(i,2)**2 &
+            & + pos_array(i,3)**2)
 
-    rad_array(:,1)=sqrt(pos_array(:,1)**2 &
-         & + pos_array(:,2)**2 &
-         & + pos_array(:,3)**2)
+       if (rad_array(i,1).lt.small_number)then 
+          rad_array(i,2)=0.0_dp
+          rad_array(i,3)=0.0_dp
+       else
+          rad_array(i,2)=atan2(pos_array(i,2),pos_array(i,1))
 
-    rad_array(:,2)=atan2(pos_array(:,2),pos_array(:,1))
-    rad_array(:,3)=atan(sqrt((pos_array(:,1)**2 &
-         & + pos_array(:,2)**2) /&
-         & pos_array(:,3)))
-    pos_array(:,1)=180.0_dp*rad_array(:,1)/pi
+
+          rad_array(i,3)=atan(sqrt((pos_array(i,1)**2 &
+               & + pos_array(i,2)**2) /&
+               & pos_array(i,3)))
+
+       end if
+
+    end do
+
+
+    pos_array(:,1)=rad_array(:,1)
     pos_array(:,2)=180.0_dp*rad_array(:,2)/pi
     pos_array(:,3)=180.0_dp*rad_array(:,3)/pi
 
@@ -1066,25 +1084,70 @@ contains
   end subroutine io_cart_to_radial
 
 
+  subroutine io_vel_to_ang(vel_array,pos_array)
+    implicit none
+    real(dp),dimension(:,:), intent(in)    :: pos_array
+    real(dp),dimension(:,:), intent(inout) :: vel_array
+    real(dp),dimension(:,:),allocatable    :: rad_array
+    real(dp) :: r
+    integer  :: stat,i
+    call trace_entry("io_vel_to_ang")
+
+
+    allocate(rad_array(1:current_structure%n_bodies,1:3),stat=stat)
+    if (stat.ne.0)call io_errors("Error in I/O: allocate rad_array")
+    vel_array(:,1)=pi*vel_array(:,1)/180.0_dp
+    vel_array(:,2)=pi*vel_array(:,2)/180.0_dp
+    vel_array(:,3)=pi*vel_array(:,3)/180.0_dp
+
+
+    do i = 1, current_structure%n_bodies
+       r=sqrt(sum(pos_array(i,:)**2))
+       if (r.lt.small_number)then
+
+          rad_array(i,1)=0.0_dp
+          rad_array(i,2)=0.0_dp
+          rad_array(i,3)=0.0_dp
+       else 
+
+
+          rad_array(i,1)=(pos_array(i,2)*vel_array(i,3)-pos_array(i,3)*vel_array(i,2))/r**2
+          rad_array(i,2)=(pos_array(i,3)*vel_array(i,1)-pos_array(i,1)*vel_array(i,3))/r**2
+          rad_array(i,3)=(pos_array(i,1)*vel_array(i,2)-pos_array(i,2)*vel_array(i,1))/r**2
+       end if
+    end do
+    vel_array(:,1)=rad_array(:,1)
+    vel_array(:,2)=rad_array(:,2)
+    vel_array(:,3)=rad_array(:,3)
+
+
+
+    call trace_exit("io_vel_to_ang")
+  end subroutine io_vel_to_ang
+
+  
+
   subroutine io_radial_to_cart(pos_array)
     implicit none
 
     real(dp),dimension(:,:), intent(inout) :: pos_array
     real(dp),dimension(:,:),allocatable  :: rad_array
-    integer  :: stat
+    integer  :: stat,i
 
     call trace_entry("io_radial_to_cart")
 
     allocate(rad_array(1:current_structure%n_bodies,1:3),stat=stat)
     if (stat.ne.0)call io_errors("Error in I/O: allocate rad_array")
 
-    pos_array(:,1)=pi*pos_array(:,1)/180.0_dp
+    pos_array(:,1)=pos_array(:,1)
     pos_array(:,2)=pi*pos_array(:,2)/180.0_dp
     pos_array(:,3)=pi*pos_array(:,3)/180.0_dp
+    do i = 1,current_structure%n_bodies
+       rad_array(i,1)=pos_array(i,1)*sin(pos_array(i,3))*cos(pos_array(i,2))
+       rad_array(i,2)=pos_array(i,1)*sin(pos_array(i,3))*sin(pos_array(i,2))
+       rad_array(i,3)=pos_array(i,1)*cos(pos_array(i,3))
 
-    rad_array(:,1)=pos_array(:,1)*sin(pos_array(:,3))*cos(pos_array(:,2))
-    rad_array(:,2)=pos_array(:,1)*sin(pos_array(:,3))*cos(pos_array(:,2))
-    rad_array(:,3)=pos_array(:,1)*cos(pos_array(:,3))
+    end do
 
     pos_array(:,1)=rad_array(:,1)
     pos_array(:,2)=rad_array(:,2)
@@ -1150,7 +1213,16 @@ contains
             & current_structure%init_velocity(i,2),&
             & current_structure%init_velocity(i,3)
        !write(current_structure%labels(i),'(a,i3)')"Object ",i
-       if (stat.ne.0) call io_errors("Error in I/O: read structure block")
+       if (stat.ne.0)then
+          !backspace(1)
+          !read(1,'(a)')buff
+          !print*,buff
+          !if (len(trim(buff)).eq.0)then
+          !   cycle
+          !else            
+          call io_errors("Error in I/O: read structure block")
+          !end if
+       end if
     end do
     read(1,*)buff
 
@@ -1161,8 +1233,8 @@ contains
        current_structure%init_cart=.true.
     case("positions_radial")
        current_structure%init_radial=.true.
-       call io_cart_to_radial(current_structure%positions)
-       call io_cart_to_radial(current_structure%init_velocity)
+       call io_radial_to_cart(current_structure%positions)
+       call io_vel_to_ang(current_structure%init_velocity,current_structure%positions)
     case default
        call io_errors("Error in I/O: Unknown BLOCK type "// block_type1)
     end select
@@ -1172,13 +1244,5 @@ contains
     call trace_exit("io_block_parse")
     return
   end subroutine io_block_parse
-
-
-
-
+  
 end module io
- 
- 
- 
- 
- 
