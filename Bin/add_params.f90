@@ -93,7 +93,7 @@ program add_params
            read(io_unit,*,iostat=stat)junk,junk2,max_param
            read(io_unit,*)junk
            max_param=max_param+1
-           backspace(io_buff)
+
            backspace(io_buff)
            write(io_buff,*)"integer,parameter::max_keys=",max_param
            write(io_buff,*)" ! %End: max_param"
@@ -123,6 +123,7 @@ program add_params
            write(io_buff,*)"read(param,*,iostat=stat) dummy_params%"//trim(var_name)
            write(io_buff,*)'if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)'
            write(io_buff,*)"present_array(i)=key"
+           write(io_buff,*)"! %End: case_read"
         end if
      else
         write(io_buff,*)trim(line)

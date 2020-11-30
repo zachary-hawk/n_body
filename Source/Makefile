@@ -27,11 +27,11 @@ endif
 
 ifeq ($(COMMS_ARCH),mpi)
 
-n_body.mpi: n_body.o io.o trace.o comms_mpi.o pot.o
-	$(MPI_F90) -o n_body.mpi  n_body.o io.o trace.o comms_mpi.o pot.o $(FCFLAGS)
+n_body.mpi: n_body.o io.o trace.o comms_mpi.o pot.o diff.o
+	$(MPI_F90) -o n_body.mpi  n_body.o io.o trace.o comms_mpi.o pot.o diff.o $(FCFLAGS)
 # Here are the compile steps
 
-n_body.o:n_body.f90 io.o trace.o comms_mpi.o pot.o 
+n_body.o:n_body.f90 io.o trace.o comms_mpi.o pot.o diff.o
 	$(MPI_F90) -c  n_body.f90 $(FCFLAGS)
 
 io.o:./io.f90 trace.o comms_mpi.o
@@ -46,6 +46,9 @@ comms_mpi.o:./comms_mpi.f90 trace.o
 
 pot.o:./pot.f90 comms_mpi.o io.o trace.o
 	$(MPI_F90) -c ./pot.f90 $(FCFLAGS)
+diff.o:./diff.f90 comms_mpi.o io.o trace.o pot.o
+	$(MPI_F90) -c ./diff.f90 $(FCFLAGS)
+
 
 
 #life.o:./life.f90 comms_mpi.o io.o trace.o

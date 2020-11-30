@@ -910,6 +910,7 @@ contains
     !==============================================================================!
     integer :: count
     real(dp):: start_buff
+
     call trace_entry("COMMS_BCAST_DOUBLE")
     call MPI_BCAST(start_buff, count,MPI_DOUBLE,0,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_BCAST_DOUBLE")
@@ -1014,8 +1015,8 @@ contains
     else
        allocate(comms_scheme_array(0:nprocs-1,1:4))
     end if
-
-    if (nprocs.lt.N)then
+    print*,nprocs
+    if (nprocs.lt.N.and.nprocs.ne.1)then
        allocate(split(1:nprocs))
 
        split(:)=0
@@ -1038,7 +1039,7 @@ contains
        comms_scheme_array(:,4)=N
     else if (nprocs.eq.1)then
        comms_scheme_array(0,1)=1
-       comms_scheme_array(0,2)=1
+       comms_scheme_array(0,2)=N
        comms_scheme_array(0,3)=1
        comms_scheme_array(0,4)=N
        
