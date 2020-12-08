@@ -22,7 +22,7 @@ contains
 
     open(newunit=u,file="earth.dat",form="FORMATTED",status="unknown",access="stream")
     open(newunit=k,file="energy.dat",form="FORMATTED",status="unknown",access="stream")
-    do t=1,10000
+    do t=1,100
        call pot_calculate(G_pot,struct)
        !print*,G_pot%pot_dir(2,:), G_pot%pot_array(2)
        do ni  = comms_scheme_array(rank,1),comms_scheme_array(rank,2)

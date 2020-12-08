@@ -1,9 +1,10 @@
+!---- File documented by Fortran Documenter, Z.Hawkhead
 module pot
   use trace, only : trace_entry, trace_exit
   use io
   use comms
   implicit none
-  
+
 
   type potential
      real(dp), allocatable,dimension(:)   :: pot_array
@@ -13,18 +14,29 @@ module pot
 
 
 
-  
+
 contains
-  
+
   subroutine pot_allocate(dummy_pot,struct)
+    !==============================================================================!
+    !                           P O T _ A L L O C A T E                            !
+    !==============================================================================!
+    ! Subroutine for allocating memory for holding potential data type             !
+    !------------------------------------------------------------------------------!
+    ! Arguments:                                                                   !
+    !           dummy_pot,         intent :: inout                                 !
+    !           struct,            intent :: in                                    !
+    !------------------------------------------------------------------------------!
+    ! Author:   Z. Hawkhead  03/12/2020                                            !
+    !==============================================================================!
     implicit none
     type(potential),intent(inout) :: dummy_pot
     type(structure),intent(in) :: struct
     integer  :: n
     integer :: stat,ni
 
-    
-    
+
+
     call trace_entry("pot_allocate")
     ! The potential array will be allocated on all processes and then zeroed
     if (allocated(dummy_pot%pot_array)) call io_errors("Error in POT: potential dummy_pot already allocated")
@@ -38,12 +50,24 @@ contains
     if (stat.ne.0) call io_errors("Error in POT: allocate pot_dir")
 
     dummy_pot%is_allocated=.true.
-    
+
     call trace_exit("pot_allocate")
     return
   end subroutine pot_allocate
 
   subroutine pot_calculate(dummy_pot,struct)
+    !==============================================================================!
+    !                          P O T _ C A L C U L A T E                           !
+    !==============================================================================!
+    ! Subroutine for calculating the gravitational potential and total energy of   !
+    ! a system of objects                                                          !
+    !------------------------------------------------------------------------------!
+    ! Arguments:                                                                   !
+    !           dummy_pot,         intent :: inout                                 !
+    !           struct,            intent :: inout                                 !
+    !------------------------------------------------------------------------------!
+    ! Author:   Z. Hawkhead  03/12/2020                                            !
+    !==============================================================================!
     implicit none
     type(potential),intent(inout) :: dummy_pot
     type(structure),intent(inout) :: struct
@@ -93,7 +117,7 @@ contains
        call comms_reduce_double(sum(dir_sum(ni,:,3)),dummy_pot%pot_dir(ni,3),1,"MPI_SUM")
     end do
 
-    
+
     do  ni=1,struct%n_bodies
        dummy_pot%pot_dir(ni,:)=dummy_pot%pot_dir(ni,:)/sqrt(sum(dummy_pot%pot_dir(ni,:)**2))
 
@@ -114,10 +138,10 @@ contains
 
     return
   end subroutine pot_calculate
-  
 
 
-  
+
+
 
 end module pot
 

@@ -21,7 +21,7 @@ module COMMS
   logical,public,save                  :: on_root_node=.true.
   
   character(6)                         :: comms_arch="SERIAL"
-
+  integer,public,save,dimension(:,:),allocatable :: comms_scheme_array
 
 
   
@@ -909,5 +909,26 @@ contains
 
     !call trace_exit("COMMS_WTIME")
   end function COMMS_WTIME
+
+  subroutine COMMS_SCHEME(N)
+    implicit none
+    integer,intent(in) :: N
+    integer :: n_par,U_par
+    integer, dimension(:),allocatable :: split
+    integer :: i,j,k
+
+    call trace_entry("comms_scheme")
+
+    ! allocate the scheme array                                                                                                                                                                             
+
+    allocate(comms_scheme_array(0:nprocs,1:4))
+
+    comms_scheme_array(0,1)=1
+    comms_scheme_array(0,2)=N
+    comms_scheme_array(0,3)=1
+    comms_scheme_array(0,4)=N
+    call trace_exit("comms_scheme")
+  end subroutine COMMS_SCHEME
+
 
 end module COMMS
