@@ -42,8 +42,8 @@ subsystem:
 	install -m 557 $(SOURCE)/n_body.mpi $(BUILD_DIR)/$(COMMS_ARCH)_$(F90)
 	mv $(SOURCE)/*.o $(BUILD_DIR)/$(COMMS_ARCH)_$(F90)
 	mv $(SOURCE)/*.mod $(BUILD_DIR)/$(COMMS_ARCH)_$(F90)
-	rm -f $(SOURCE)/n_body.mpi
-
+	cp $(BUILD_DIR)/orbit.py $(BUILD_DIR)/$(COMMS_ARCH)_$(F90)
+	rm -f $(SOURCE)/n_body.mpi	
 .phony: install
 
 clean:
@@ -64,6 +64,7 @@ subsystem:
 	install -m 557 $(SOURCE)/n_body.serial $(BUILD_DIR)/$(COMMS_ARCH)_$(F90)/n_body.serial
 	mv $(SOURCE)/*.o $(BUILD_DIR)/$(COMMS_ARCH)_$(F90)
 	mv $(SOURCE)/*.mod $(BUILD_DIR)/$(COMMS_ARCH)_$(F90)
+	cp $(BUILD_DIR)/orbit.py $(BUILD_DIR)/$(COMMS_ARCH)_$(F90)
 
 	rm -f $(SOURCE)/n_body.serial
 .phony: install

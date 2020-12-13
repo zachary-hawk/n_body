@@ -353,7 +353,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer:: count,dest_rank,tag
-    integer,dimension(count) :: send_buff
+    integer,dimension(1:count) :: send_buff
     call trace_entry("COMMS_SEND_INT_ARRAY")
     call MPI_SEND(send_buff,count,MPI_INT,dest_rank,tag,MPI_COMM_WORLD,ierr)
     call trace_exit("COMMS_SEND_INT_ARRAY")
@@ -374,7 +374,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer:: count,dest_rank,tag
-    real,dimension(count) :: send_buff
+    real,dimension(1:count) :: send_buff
     call trace_entry("COMMS_SEND_REAL_ARRAY")
     call MPI_SEND(send_buff,count,MPI_FLOAT,dest_rank,tag,MPI_COMM_WORLD,ierr)
     call trace_exit("COMMS_SEND_REAL_ARRAY")
@@ -395,7 +395,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer:: count,dest_rank,tag
-    real(dp),dimension(count) :: send_buff
+    real(dp),dimension(1:count) :: send_buff
     call trace_entry("COMMS_SEND_DOUBLE_ARRAY")
     call MPI_SEND(send_buff,count,MPI_DOUBLE,dest_rank,tag,MPI_COMM_WORLD,ierr)
     call trace_exit("COMMS_SEND_DOUBLE_ARRAY")
@@ -543,7 +543,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer:: count,source,tag
-    integer,dimension(count),intent(inout) :: recv_buff
+    integer,dimension(1:count),intent(inout) :: recv_buff
     call MPI_RECV(recv_buff,count,MPI_INT,source,tag,MPI_COMM_WORLD,status1,ierr)
   end subroutine COMMS_RECV_INT_ARRAY
 
@@ -562,7 +562,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer :: count,source,tag
-    real,dimension(count),intent(inout) :: recv_buff
+    real,dimension(1:count),intent(inout) :: recv_buff
     call trace_entry("COMMS_RECV_REAL_ARRAY")
     call MPI_RECV(recv_buff,count,MPI_REAL,source,tag,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_RECV_REAL_ARRAY")
@@ -583,7 +583,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer :: count,source,tag
-    real(dp),dimension(count),intent(inout) :: recv_buff
+    real(dp),dimension(1:count),intent(inout) :: recv_buff
     call trace_entry("COMMS_RECV_DOUBLE_ARRAY")
     call MPI_RECV(recv_buff,count,MPI_DOUBLE,source,tag,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_RECV_DOUBLE_ARRAY")
@@ -734,8 +734,8 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer:: count
-    integer,dimension(count),intent(inout) :: recv_buff
-    integer,dimension(count) :: send_buff
+    integer,dimension(1:count),intent(inout) :: recv_buff
+    integer,dimension(1:count) :: send_buff
     character(*) :: OP
 
     call trace_entry("COMMS_REDUCE_INT_ARRAY")
@@ -767,8 +767,8 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer:: count
-    real,dimension(count),intent(inout) :: recv_buff
-    real,dimension(count) :: send_buff
+    real,dimension(1:count),intent(inout) :: recv_buff
+    real,dimension(1:count) :: send_buff
     character(*) :: OP
     call trace_entry("COMMS_REDUCE_REAL_ARRAY")
     if (trim(OP).eq."MPI_MAX")then
@@ -797,8 +797,8 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer:: count
-    real(dp),dimension(count),intent(inout) :: recv_buff
-    real(dp),dimension(count) :: send_buff
+    real(dp),dimension(1:count),intent(inout) :: recv_buff
+    real(dp),dimension(1:count) :: send_buff
     character(*) :: OP
 !    print*,rank, "before"
     call trace_entry("COMMS_REDUCE_DOUBLE_ARRAY")
@@ -931,7 +931,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer :: count
-    integer,dimension(count) :: start_buff
+    integer,dimension(1:count) :: start_buff
     call trace_entry("COMMS_BCAST_INT_ARRAY")
     call MPI_BCAST(start_buff, count,MPI_INT,0,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_BCAST_INT_ARRAY")
@@ -951,7 +951,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer :: count
-    real,dimension(count) :: start_buff
+    real,dimension(1:count) :: start_buff
     call MPI_BCAST(start_buff, count,MPI_FLOAT,0,MPI_COMM_WORLD,status1,ierr)
   end subroutine COMMS_BCAST_REAL_ARRAY
 
@@ -969,7 +969,7 @@ contains
     ! Author:   Z. Hawkhead  16/08/2019                                            !
     !==============================================================================!
     integer :: count
-    real(dp),dimension(count) :: start_buff
+    real(dp),dimension(1:count) :: start_buff
     call trace_entry("COMMS_BCAST_DOUBLE_ARRAY")
     call MPI_BCAST(start_buff, count,MPI_DOUBLE,0,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_BCAST_DOUBLE_ARRAY")
@@ -1079,5 +1079,5 @@ contains
     return
   end subroutine COMMS_SCHEME
 
-  
+
 end module COMMS

@@ -14,6 +14,7 @@ module io
   character(len=128),public                :: info     = "Parallel code for n-body gravitational simulations."
   integer,           public,parameter      :: stdout = 984
   integer,           public,parameter      :: dp = real64
+  integer,           public,parameter      :: config_out=489
   real,              public,parameter      :: pi=3.1415926535_dp
   real(dp),          public,parameter      :: small_number= 1e-15
   real(dp),          public,parameter      :: G = 6.67430E-11
@@ -46,11 +47,11 @@ module io
      logical          :: dry_run           = .false.
 
      character(len=30) :: diff_method = 'euler'
-     real(dp) :: epsilon =    0.0000000000000000
-     logical :: write_config = .true.
-     logical :: write_fmt = .false.
-     character(len=30) :: units = 'AU                            '
-     real(dp) :: energy_tol =    9.9999999999999991E+028
+     real(dp)          :: epsilon =    0.0000000000000000
+     logical           :: write_config = .true.
+     logical           :: write_fmt = .false.
+     character(len=30) :: units = 'AU'
+     real(dp)          :: energy_tol =    10.0E+028
      character(len=30) :: var_time = 'fixed'
      ! %End: parameters
   end type parameters
@@ -65,8 +66,8 @@ module io
   character(len=30),parameter,public :: key_write_config   = 'write_output_configuration'
   character(len=30),parameter,public :: key_write_fmt   = 'write_formatted_positions'
   character(len=30),parameter,public :: key_units   = 'units'
-  character(len=30),parameter,public ::key_energy_tol   = 'energy_tol'
-  character(len=30),parameter,public ::key_var_time   = 'time_method'
+  character(len=30),parameter,public :: key_energy_tol   = 'energy_tol'
+  character(len=30),parameter,public :: key_var_time   = 'time_method'
   ! %End: keys
 
 
@@ -96,8 +97,9 @@ module io
      integer                                      :: nx, ny, nz    ! Grid dimensions for grid initialisation n_bodies=nx*ny*nz
      real(dp)                                     :: dnx,dny,dnz   ! Grid spacings for grid initalisation
      real(dp)                                     :: tot_energy
-
+     real(dp)                                     :: sys_time = 0.0_dp
   end type structure
+
 
 
   type(parameters),public,save :: current_params
@@ -153,6 +155,7 @@ contains
        end do
        close(1)
     end if
+    max_params=max_params+1
     ! Allocate space for the params array
     allocate(present_array(1:max_params))
     do i=1,max_params
@@ -164,6 +167,8 @@ contains
 
 
 
+
+    
     ! Try and open the struct file
     inquire(file="struct.n_body",exist=file_exists_struct)
     if (.not.file_exists_struct)call io_errors("Error in I/O: No structure file")
@@ -187,10 +192,19 @@ contains
 
 
     ! Open up the main file for the output
-    open(stdout,file="out.n_body",RECL=8192,form="FORMATTED",encoding='utf-8')
+    open(stdout,file="out.n_body",RECL=8192,form="FORMATTED")
 
     call io_flush(stdout)
     call io_header()
+
+    if(current_params%write_config)then
+       open(unit=config_out,file="sys.n_body",form="UNFORMATTED")
+       write(config_out)current_structure%n_bodies
+       write(config_out)current_params%calc_len
+       write(config_out)current_structure%labels(:)
+       call io_write_config(current_structure)
+    end if
+
     call trace_exit("io_initialise")
 
 
@@ -253,7 +267,7 @@ contains
           !Do some trimming
           key=adjustl(trim(io_case(key)))
           param=adjustl(trim(io_case(param)))
-     
+
           !print*,trim(key),i
           ! %Begin: case_read
           select case(key)
@@ -297,7 +311,7 @@ contains
              read(param,*,iostat=stat) dummy_params%energy_tol
              if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
              present_array(i)=key
-          case(key_var_time                                                    )
+          case(key_var_time)
              read(param,*,iostat=stat) dummy_params%var_time
              if (stat.ne.0) call io_errors("Error in I/O: Error parsing value: "//param)
              present_array(i)=key
@@ -313,8 +327,6 @@ contains
        return
     end if
     ! Check for duplicates
-    !print*, (trim(present_array(i)),i=1,max_params)
-
 
     do i=1,max_params
        !print*,trim(present_array(i))
@@ -1126,9 +1138,10 @@ contains
        line=io_case(line)
 
        if (index(line,"%block").ne.0) then
-          call io_block_parse(line,stat)
-       else
-          call io_freeform_read(line,key,param,comment)
+          call io_block_parse(line,stat,current_structure)
+       !else
+          !call io_errors("Error in I/O: structure_read")
+          !   call io_freeform_read(line,key,param,comment)
        end if
 
 
@@ -1299,7 +1312,7 @@ contains
   end subroutine io_radial_to_cart
 
 
-  subroutine io_block_parse(line,stat)
+  subroutine io_block_parse(line,stat,block_struct)
     !==============================================================================!
     !                         I O _ B L O C K _ P A R S E                          !
     !==============================================================================!
@@ -1314,15 +1327,27 @@ contains
     implicit none
     character(*), intent(in) :: line
     integer ,intent(inout) ::stat
+    type(structure), intent(inout) :: block_struct
     character(len=6) :: block_str
     character(len=20):: block_type1,block_type2
     character(len=300):: buff
     integer :: in_stat, i, j, k ,n=0,n_com=0, counter
     logical :: block_closed
+    real(dp):: mass,sx,sy,sz
+    real(dp),dimension(1:3) :: vel
+    
 
     call trace_entry("io_block_parse")
     read(line,*,iostat=in_stat) block_str,block_type1
+
     if (in_stat.ne.0) call io_errors("Error in I/O: problem parsing %BLOCK")
+    if (trim(io_case(block_type1)).eq."positions_cart")then
+       block_struct%init_cart=.true.
+    else if (trim(io_case(block_type1)).eq."positions_radial") then
+       block_struct%init_radial=.true.
+    else if (trim(io_case(block_type1)).eq."positions_grid") then
+       block_struct%init_grid=.true.
+    end if
     do
        read(1,'(a)',iostat=stat)buff
        buff=trim(adjustl(io_case(buff)))
@@ -1343,77 +1368,165 @@ contains
 
 
     !so now we have read the block and got n_bodies, go back and read again
-    current_structure%n_bodies=n-n_com
-!!$       print*,current_structure%n_bodies
+    block_struct%n_bodies=n-n_com
+!!$       print*,block_struct%n_bodies
 !!$       print*,n_com
-    if (current_structure%n_bodies.lt.2) call io_errors("Error in I/O: Number of Objects must be greater than 1")
-    ! allocate the stuff
-    n=current_structure%n_bodies
-    allocate(current_structure%positions(1:n,1:3),stat=stat)
-    if (stat.ne.0)call io_errors("Error in I/O: allocate current_structure%positions")
-    allocate(current_structure%init_velocity(1:n,1:3),stat=stat)
-    if (stat.ne.0)call io_errors("Error in I/O: allocate current_structure%init_velocity")
-    allocate(current_structure%masses(1:n),stat=stat)
-    if (stat.ne.0)call io_errors("Error in I/O: allocate current_structure%masses")
-    allocate(current_structure%labels(1:n),stat=stat)
-    if (stat.ne.0)call io_errors("Error in I/O: allocate current_structure%labels")
-    allocate(current_structure%momentum(1:n,1:3),stat=stat)
-    if (stat.ne.0)call io_errors("Error in I/O: allocate current_structure%momentum")
+    if (block_struct%n_bodies.lt.2) call io_errors("Error in I/O: Number of Objects must be greater than 1")
+
+    if (.not.block_struct%init_grid)then 
+
+       ! allocate the stuff
+       n=block_struct%n_bodies
+       allocate(block_struct%positions(1:n,1:3),stat=stat)
+       if (stat.ne.0)call io_errors("Error in I/O: allocate block_struct%positions")
+       allocate(block_struct%init_velocity(1:n,1:3),stat=stat)
+       if (stat.ne.0)call io_errors("Error in I/O: allocate block_struct%init_velocity")
+       allocate(block_struct%masses(1:n),stat=stat)
+       if (stat.ne.0)call io_errors("Error in I/O: allocate block_struct%masses")
+       allocate(block_struct%labels(1:n),stat=stat)
+       if (stat.ne.0)call io_errors("Error in I/O: allocate block_struct%labels")
+       allocate(block_struct%momentum(1:n,1:3),stat=stat)
+       if (stat.ne.0)call io_errors("Error in I/O: allocate block_struct%momentum")
 
 
-    do i=1,n+1+n_com
-       backspace(1)
-    end do
-    i=1
-    counter=0
-    do while (i.lt.n+1)
-       read(1,"(a)")buff
-       buff=trim(adjustl(buff))
-
-       if (buff(1:1).eq."!" .or. buff(1:1).eq."#".or.buff(1:1).eq.'') then
-          counter=counter+1
-          cycle
-       else
-          read(buff,*,iostat=stat) current_structure%labels(i),&
-               & current_structure%masses(i),&
-               & current_structure%positions(i,1), &
-               & current_structure%positions(i,2), &
-               & current_structure%positions(i,3), &
-               & current_structure%init_velocity(i,1),&
-               & current_structure%init_velocity(i,2),&
-               & current_structure%init_velocity(i,3)
-          !write(current_structure%labels(i),'(a,i3)')"Object ",i
-          if (stat.ne.0)then
-             call io_errors("Error in I/O: read structure block")
-          end if
-          i=i+1
-       end if
-    end do
-    if (counter.ne.n_com)then
-       do i=1,n_com-counter
-          read(1,*)buff
+       do i=1,n+1+n_com
+          backspace(1)
        end do
-    end if
-    read(1,*)buff
+       i=1
+       counter=0
+       do while (i.lt.n+1)
+          read(1,"(a)")buff
+          buff=trim(adjustl(buff))
+
+          if (buff(1:1).eq."!" .or. buff(1:1).eq."#".or.buff(1:1).eq.'') then
+             counter=counter+1
+             cycle
+          else
+             read(buff,*,iostat=stat) block_struct%labels(i),&
+                  & block_struct%masses(i),&
+                  & block_struct%positions(i,1), &
+                  & block_struct%positions(i,2), &
+                  & block_struct%positions(i,3), &
+                  & block_struct%init_velocity(i,1),&
+                  & block_struct%init_velocity(i,2),&
+                  & block_struct%init_velocity(i,3)
+             !write(block_struct%labels(i),'(a,i3)')"Object ",i
+             if (stat.ne.0)then
+                call io_errors("Error in I/O: read structure block")
+             end if
+             i=i+1
+          end if
+       end do
+       if (counter.ne.n_com)then
+          do i=1,n_com-counter
+             read(1,*)buff
+          end do
+       end if
+       read(1,*)buff
+    else
+
+       do i=1,n+1+n_com
+          backspace(1)
+       end do
+       i=0
+       counter=0
+       do while (i.lt.4)
+          read(1,"(a)")buff
+          buff=trim(adjustl(buff))
+
+          if (buff(1:1).eq."!" .or. buff(1:1).eq."#".or.buff(1:1).eq.'') then
+             counter=counter+1
+             cycle
+          else
+
+             if (i.eq.0)then ! read mass
+                read(buff,*,iostat=stat) mass
+             else if (i.eq.1) then !read grid size
+                read(buff,*,iostat=stat) block_struct%nx,block_struct%ny,block_struct%nz
+             else if(i.eq.2)then !read spacing
+                read(buff,*,iostat=stat) block_struct%dnx,block_struct%dny,block_struct%dnz
+             else if (i.eq.3)then !read the velocity
+                read(buff,*,iostat=stat) vel
+             end if
+             !print*,stat
+             if (stat.ne.0)then
+                call io_errors("Error in I/O: read grid structure block")
+             end if
+             i=i+1
+          end if
+       end do
+       if (counter.ne.n_com)then
+          do i=1,n_com-counter
+             read(1,*)buff
+          end do
+       end if
+       read(1,*)buff
 
 
-    ! now lets check if we need to convert.
-    select case(block_type1)
-    case("positions_cart")
-       current_structure%init_cart=.true.
-    case("positions_radial")
-       current_structure%init_radial=.true.
-       call io_radial_to_cart(current_structure%positions)
-       call io_vel_to_ang(current_structure%init_velocity,current_structure%positions)
-    case default
-       call io_errors("Error in I/O: Unknown BLOCK type "// block_type1)
-    end select
+
+       ! now we allocate 
+       block_struct%n_bodies=block_struct%nx*block_struct%ny*block_struct%nz
+       n=block_struct%n_bodies
+       allocate(block_struct%positions(1:n,1:3),stat=stat)
+       if (stat.ne.0)call io_errors("Error in I/O: allocate block_struct%positions")
+       allocate(block_struct%init_velocity(1:n,1:3),stat=stat)
+       if (stat.ne.0)call io_errors("Error in I/O: allocate block_struct%init_velocity")
+       allocate(block_struct%masses(1:n),stat=stat)
+       if (stat.ne.0)call io_errors("Error in I/O: allocate block_struct%masses")
+       allocate(block_struct%labels(1:n),stat=stat)
+       if (stat.ne.0)call io_errors("Error in I/O: allocate block_struct%labels")
+       allocate(block_struct%momentum(1:n,1:3),stat=stat)
+       if (stat.ne.0)call io_errors("Error in I/O: allocate block_struct%momentum")
+
+       block_struct%masses(:)=mass
+       do n=1,block_struct%n_bodies
+          block_struct%init_velocity(n,1:3)=vel
+       end do
+       n=1
+       
+
+       sx=real(block_struct%nx,dp)/2_dp+0.5_dp
+       sy=real(block_struct%ny,dp)/2_dp+0.5_dp
+       sz=real(block_struct%nz,dp)/2_dp+0.5_dp
+       
+       
+          do i=1,block_struct%nx
+             do j=1,block_struct%ny
+                do k=1,block_struct%nz
+                   block_struct%positions(n,1)=(i-sx)*block_struct%dnx
+                   block_struct%positions(n,2)=(j-sy)*block_struct%dny
+                   block_struct%positions(n,3)=(k-sz)*block_struct%dnx
+                   write(block_struct%labels(n),'("Obj_",i0.2,"_",i0.2,"_",i0.2)')i,j,k
+                   n=n+1
+                end do
+             end do
+          end do
 
 
 
-    call trace_exit("io_block_parse")
-    return
-  end subroutine io_block_parse
+       end if
+
+
+       ! now lets check if we need to convert.
+       select case(block_type1)
+       case("positions_cart")
+          block_struct%init_cart=.true.
+       case("positions_radial")
+          block_struct%init_radial=.true.
+          call io_radial_to_cart(block_struct%positions)
+          call io_vel_to_ang(block_struct%init_velocity,block_struct%positions)
+       case("positions_grid")
+          block_struct%init_grid=.true.
+          call io_vel_to_ang(block_struct%init_velocity,block_struct%positions)
+       case default
+          call io_errors("Error in I/O: Unknown BLOCK type "// block_type1)
+       end select
+
+
+
+       call trace_exit("io_block_parse")
+       return
+     end subroutine io_block_parse
 
 
   subroutine io_write_fmt_structure(my_struct)
@@ -1423,8 +1536,10 @@ contains
     integer  ::  struct_unit
     ! open the output unit
     call trace_entry("io_write_fmt_structure")
+    write(stdout,*)"Writing final positions to file."
     open(newunit=struct_unit,file="struct-out.n_body",form="FORMATTED",status="UNKNOWN",RECL=8192)
-
+    
+    
     write(struct_unit,*)"%BLOCK POSITIONS_CART"
     do nb=1,my_struct%n_bodies
        write(struct_unit,99)trim(my_struct%labels(nb)),my_struct%masses(nb),my_struct%positions(nb,:),my_struct%init_velocity(nb,:)
@@ -1437,6 +1552,22 @@ contains
     call trace_exit("io_write_fmt_structure")
     return
   end subroutine io_write_fmt_structure
+
+
+
+  subroutine io_write_config(mystruct)
+    implicit none
+    type(structure),intent(in) :: mystruct
+    call trace_entry("io_write_config")
+    write(config_out)mystruct%sys_time
+    write(config_out)mystruct%positions(:,:)
+    write(config_out)mystruct%init_velocity(:,:)
+
+
+    call trace_exit("io_write_config")
+    return   
+  end subroutine io_write_config
+
 
   
 end module io
