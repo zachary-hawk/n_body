@@ -1042,7 +1042,6 @@ contains
 11  format(1x,A,T50,":",5x,f9.2,1x,A)  !real
 12  format(1x,A,T50,":",5x,L9,1x,A)    !logical
 
-
     call date_and_time(b(1), b(2), b(3), d_t)
     months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -1051,7 +1050,7 @@ contains
     write(stdout,*)"+"//repeat("-",width-3)//"+"
 
 1000 FORMAT(1x,"|",36x,i2.2,":",i2.2,":",i2.2,",",1x,A,1x,i2.2,1x,i4,37x,"|")
-
+    
     call trace_exit("io_write_results")
     return
   end subroutine io_write_results

@@ -1,11 +1,11 @@
 module diff
   use comms
   use io, only : current_params,current_structure,io_errors,structure,dp,&
-       & io_write_config
+       & io_write_config,stdout,io_flush
   use trace, only : trace_entry,trace_exit
   use pot, only : pot_allocate, pot_calculate,potential
   implicit none
-
+  real(dp),private :: perc_prog=10.0
 contains
 
   subroutine diff_solver(struct)
@@ -14,7 +14,20 @@ contains
     type(potential)   :: G_pot
     integer :: ni,u,i,j,k
     integer :: t
+    integer         :: width=97
+
     call trace_entry("diff_solver")
+
+    ! Write out the time steps
+
+    write(stdout,*)
+    write(stdout,*)"+",repeat("=",width-3),"+ <--DIFF"
+    write(stdout,'(1x,A,T40,a,T97,a)')'|',"DIFFERENTIAL SOLVER","| <--DIFF"
+    write(stdout,*)"+",repeat("=",width-3),"+ <--DIFF"
+    write(stdout,'(" |",T10,a,T75,a,T97,"| <--DIFF")')"Percentage Complete (%) ","Time (s)"
+    write(stdout,*)"+",repeat("=",width-3),"+ <--DIFF"
+
+
 
     ! Allocate the potential
     call pot_allocate(G_pot,struct)
@@ -64,14 +77,16 @@ contains
 
           ! send and receive
           if (.not.on_root_node)then
+             !print*,"Positions",rank,ni
              call comms_send(struct%positions(ni,:),size(struct%positions(ni,:)),0,ni)
+             !print*,"Velocity",rank,ni
              call comms_send(struct%init_velocity(ni,:),size(struct%positions(ni,:)),0,ni+struct%n_bodies)
           end if
        end  do
 
        ! Now we do the recv
        if (on_root_node)then 
-          do i = 0,nprocs-1
+          do i = 1,nprocs-1
              do ni=comms_scheme_array(i,1),comms_scheme_array(i,2)
                 call comms_recv(struct%positions(ni,:),3,i,ni)
                 call comms_recv(struct%init_velocity(ni,:),3,i,ni+struct%n_bodies)
@@ -86,19 +101,35 @@ contains
 
        ! Advance  the system clock
        struct%sys_time=struct%sys_time+current_params%time_step
-
+       if (on_root_node)call diff_progress(struct,current_params%time_step)
        ! If we are writing the file, do it here
        if (current_params%write_config)call io_write_config(struct)
 
     end do
 
+    write(stdout,*)"+",repeat("=",94),"+ <--DIFF"
 
     call trace_exit("diff_solver")
     return
   end  subroutine diff_solver
 
 
+  subroutine diff_progress(struct,time_step)
+    type(structure),intent(in) :: struct
+    real(dp),intent(in) :: time_step
+    real(dp) :: exact,ctime
 
+    exact=current_params%calc_len*perc_prog/100.0_dp
+    if (struct%sys_time-time_step.le.exact.and.struct%sys_time.gt.exact)then
+       ctime=comms_wtime()
+       write(stdout,'(" |",T10,f5.1,1x,"%",T70,f14.6,T97,"| <--DIFF")')perc_prog,ctime
+       perc_prog=perc_prog+10
+       call io_flush(stdout)
+    end if
+
+    
+    return
+  end subroutine diff_progress
 
 
 

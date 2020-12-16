@@ -238,7 +238,8 @@ contains
     comms_time=abs(comms_end_time-comms_start_time)
     io_time=abs(io_end_time-io_start_time)
 
-
+    print*,entry_array
+    print*,exit_array
 
     !if (allocated(temp_real_array)) deallocate(temp_real_array)
     !if (allocated(temp_char_array)) deallocate(temp_char_array)

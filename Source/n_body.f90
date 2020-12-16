@@ -32,12 +32,13 @@ program n_body
 
   ! do a test  call to diff
   call diff_solver(current_structure)
-
-
-  call io_write_results()
+  print*,"After diff"
+  
+  
 
   
   if (on_root_node) then
+     call io_write_results()
      if (current_params%write_fmt)&
           & call io_write_fmt_structure(current_structure)
   end if
@@ -45,8 +46,10 @@ program n_body
 
 
   call trace_exit("n_body")
-  call trace_finalise(current_params%debuging,rank)
+  print*,"trace_finalise"
+  !call trace_finalise(current_params%debuging,rank)
+  print*,"comms_finalise"
   call comms_finalise()
-
+  print*,"Fin"
 
 end program n_body
