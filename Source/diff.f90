@@ -63,7 +63,7 @@ contains
              do i=1,3
                 struct%momentum(ni,i)=struct%momentum(ni,i) + &
                      & current_params%time_step * G_pot%pot_array(ni,i)! * & ! this is the momentum... 
-                     !& G_pot%pot_dir(ni,i) !/ struct%masses(ni)
+                !& G_pot%pot_dir(ni,i) !/ struct%masses(ni)
                 struct%init_velocity(ni,i)=struct%momentum(ni,i)/struct%masses(ni)
 
              end do
@@ -85,7 +85,7 @@ contains
        end  do
 
        ! Now we do the recv
-       if (on_root_node)then 
+       if (on_root_node.and.nprocs.gt.1)then 
           do i = 1,nprocs-1
              do ni=comms_scheme_array(i,1),comms_scheme_array(i,2)
                 call comms_recv(struct%positions(ni,:),3,i,ni)
@@ -115,14 +115,17 @@ contains
 
 
   subroutine diff_progress(struct,time_step)
+    use trace, only :trace_entry, trace_exit,global_start
     type(structure),intent(in) :: struct
     real(dp),intent(in) :: time_step
     real(dp) :: exact,ctime
 
     exact=current_params%calc_len*perc_prog/100.0_dp
+    !print*,exact, struct%sys_time,global_start
     if (struct%sys_time-time_step.le.exact.and.struct%sys_time.gt.exact)then
        ctime=comms_wtime()
-       write(stdout,'(" |",T10,f5.1,1x,"%",T70,f14.6,T97,"| <--DIFF")')perc_prog,ctime
+       call cpu_time(ctime)
+       write(stdout,'(" |",T10,f5.1,1x,"%",T70,f14.6,T97,"| <--DIFF")')perc_prog,ctime-global_start
        perc_prog=perc_prog+10
        call io_flush(stdout)
     end if

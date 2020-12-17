@@ -98,7 +98,7 @@ contains
 
     call MPI_BARRIER(MPI_COMM_WORLD,ierr)
     call trace_exit("COMMS_BARRIER")
-    return
+     
   end subroutine COMMS_BARRIER
 
 
@@ -118,7 +118,7 @@ contains
     call trace_entry("COMMS_ABORT")
     call MPI_ABORT(MPI_COMM_WORLD,error_code,ierr)
     call trace_exit("COMMS_ABORT")
-    return
+     
   end subroutine COMMS_ABORT
 
 
@@ -128,7 +128,7 @@ contains
     !==============================================================================!
     !                          C O M M S _ V E R S I O N                           !
     !==============================================================================!
-    ! Subroutine wrapper for MPI_GET_VERSION command, returns the version          !
+    ! Subroutine wrapper for MPI_GET_VERSION command,  s the version          !
     ! information of the installed MPI libraries.                                  !
     !------------------------------------------------------------------------------!
     ! Arguments:                                                                   !
@@ -141,7 +141,7 @@ contains
     call trace_entry("COMMS_VERSION")
     call MPI_GET_VERSION(maj_MPI,min_MPI,ierr)
     call trace_exit("COMMS_VERSION")
-    return 
+      
   end subroutine COMMS_VERSION
 
 
@@ -163,7 +163,7 @@ contains
     CALL trace_entry("COMMS_LIBRARY_VERSION")
     call MPI_GET_LIBRARY_VERSION(MPI_version,length,ierr)
     call trace_exit("COMMS_LIBRARY_VERSION")
-    return
+     
   end subroutine COMMS_LIBRARY_VERSION
   
 
@@ -184,7 +184,7 @@ contains
     call trace_entry("COMMS_PROC_NAME")
     call MPI_GET_PROCESSOR_NAME(proc_name,proc_name_len,ierr)
     call trace_EXIT("COMMS_PROC_NAME")
-    return
+     
   end subroutine COMMS_PROC_NAME
 
 
@@ -212,7 +212,7 @@ contains
        on_root_node=.false.
     end if
     call trace_exit("COMMS_INIT")
-    return
+     
   end subroutine COMMS_INIT
 
   subroutine COMMS_FINALISE()
@@ -232,7 +232,7 @@ contains
     call trace_entry("COMMS_FINALISE")
     call MPI_FINALIZE(ierr)
     call trace_exit("COMMS_FINALISE")
-    return
+     
   end subroutine COMMS_FINALISE
 
 
@@ -254,7 +254,7 @@ contains
     call trace_entry("COMMS_RANK")
     call MPI_COMM_RANK(MPI_COMM_WORLD,rank,ierr)
     call trace_exit("COMMS_RANK")
-    return
+     
   end subroutine COMMS_RANK
 
   subroutine COMMS_SIZE(nprocs)
@@ -273,7 +273,7 @@ contains
     call trace_entry("COMMS_SIZE")
     call MPI_COMM_SIZE(MPI_COMM_WORLD,nprocs,ierr)
     call trace_exit("COMMS_SIZE")
-    return
+     
   end subroutine COMMS_SIZE
 
 
@@ -298,7 +298,7 @@ contains
     call trace_entry("COMMS_SEND_INT")
     call MPI_SEND(send_buff,count,MPI_INT,dest_rank,tag,MPI_COMM_WORLD,ierr)
     call trace_exit("COMMS_SEND_INT")
-    return
+     
   end subroutine COMMS_SEND_INT
 
   subroutine COMMS_SEND_REAL(send_buff,count,dest_rank,tag)
@@ -320,7 +320,7 @@ contains
     call trace_entry("COMMS_SEND_REAL")
     call MPI_SEND(send_buff,count,MPI_FLOAT,dest_rank,tag,MPI_COMM_WORLD,ierr)
     call trace_exit("COMMS_SEND_REAL")
-    return
+     
   end subroutine COMMS_SEND_REAL
 
   subroutine COMMS_SEND_DOUBLE(send_buff,count,dest_rank,tag)
@@ -342,7 +342,7 @@ contains
     call trace_entry("COMMS_SEND_DOUBLE")
     call MPI_SEND(send_buff,count,MPI_DOUBLE,dest_rank,tag,MPI_COMM_WORLD,ierr)
     call trace_exit("COMMS_SEND_DOUBLE")
-    return
+     
   end subroutine COMMS_SEND_DOUBLE
 
 
@@ -366,7 +366,7 @@ contains
     call trace_entry("COMMS_SEND_INT_ARRAY")
     call MPI_SEND(send_buff,count,MPI_INT,dest_rank,tag,MPI_COMM_WORLD,ierr)
     call trace_exit("COMMS_SEND_INT_ARRAY")
-    return
+     
   end subroutine COMMS_SEND_INT_ARRAY
 
   subroutine COMMS_SEND_REAL_ARRAY(send_buff,count,dest_rank,tag)
@@ -388,7 +388,7 @@ contains
     call trace_entry("COMMS_SEND_REAL_ARRAY")
     call MPI_SEND(send_buff,count,MPI_FLOAT,dest_rank,tag,MPI_COMM_WORLD,ierr)
     call trace_exit("COMMS_SEND_REAL_ARRAY")
-    return
+     
   end subroutine COMMS_SEND_REAL_ARRAY
 
   subroutine COMMS_SEND_DOUBLE_ARRAY(send_buff,count,dest_rank,tag)
@@ -410,7 +410,7 @@ contains
     call trace_entry("COMMS_SEND_DOUBLE_ARRAY")
     call MPI_SEND(send_buff,count,MPI_DOUBLE,dest_rank,tag,MPI_COMM_WORLD,ierr)
     call trace_exit("COMMS_SEND_DOUBLE_ARRAY")
-    return
+     
   end subroutine COMMS_SEND_DOUBLE_ARRAY
 
 
@@ -435,7 +435,7 @@ contains
     call trace_entry("COMMS_SEND_REAL_ARRAY2D")
     call MPI_SEND(send_buff,count1*count2,MPI_FLOAT,dest_rank,tag,MPI_COMM_WORLD,ierr)
     call trace_EXIT("COMMS_SEND_REAL_ARRAY2D")
-    return
+     
   end subroutine COMMS_SEND_REAL_ARRAY2D
 
   subroutine COMMS_SEND_RECV_REAL_ARRAY2D(send_buff,recv_buff,count1,count2,dest_rank,tag,send_rank)
@@ -462,7 +462,7 @@ contains
          MPI_FLOAT,send_rank,tag,MPI_COMM_WORLD,ierr)
     call trace_exit("COMMS_SEND_RECV_REAL_ARRAY2D")
 
-    return
+     
   end subroutine COMMS_SEND_RECV_REAL_ARRAY2D
 
 
@@ -490,7 +490,7 @@ contains
     call MPI_RECV(recv_buff,count,MPI_INT,source,tag,MPI_COMM_WORLD,status1,ierr)
     !    print*, "after",recv_buff
     call trace_EXIT("COMMS_RECV_INT")
-    return
+     
   end subroutine COMMS_RECV_INT
 
   subroutine COMMS_RECV_REAL(recv_buff,count,source,tag)
@@ -514,7 +514,7 @@ contains
     call MPI_RECV(recv_buff,count,MPI_REAL,source,tag,MPI_COMM_WORLD,status1,ierr)
     !  print*, "Recv success from rank",source 
     call trace_exit("COMMS_RECV_REAL")
-    return
+     
   end subroutine COMMS_RECV_REAL
 
   subroutine COMMS_RECV_DOUBLE(recv_buff,count,source,tag)
@@ -536,7 +536,7 @@ contains
     call trace_entry("COMMS_RECV_DOUBLE")
     call MPI_RECV(recv_buff,count,MPI_DOUBLE,source,tag,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_RECV_DOUBLE")
-    return
+     
   end subroutine COMMS_RECV_DOUBLE
 
 
@@ -559,7 +559,7 @@ contains
     integer:: count,source,tag
     integer,dimension(1:count),intent(inout) :: recv_buff
     call MPI_RECV(recv_buff,count,MPI_INT,source,tag,MPI_COMM_WORLD,status1,ierr)
-    return
+     
   end subroutine COMMS_RECV_INT_ARRAY
 
   subroutine COMMS_RECV_REAL_ARRAY(recv_buff,count,source,tag)
@@ -581,7 +581,7 @@ contains
     call trace_entry("COMMS_RECV_REAL_ARRAY")
     call MPI_RECV(recv_buff,count,MPI_REAL,source,tag,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_RECV_REAL_ARRAY")
-    return
+     
   end subroutine COMMS_RECV_REAL_ARRAY
 
   subroutine COMMS_RECV_DOUBLE_ARRAY(recv_buff,count,source,tag)
@@ -603,7 +603,7 @@ contains
     call trace_entry("COMMS_RECV_DOUBLE_ARRAY")
     call MPI_RECV(recv_buff,count,MPI_DOUBLE,source,tag,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_RECV_DOUBLE_ARRAY")
-    return
+     
   end subroutine COMMS_RECV_DOUBLE_ARRAY
 
   !2D array
@@ -627,7 +627,7 @@ contains
     call trace_entry("COMMS_RECV_REAL_ARRAY2D")
     call MPI_RECV(recv_buff,count1*count2,MPI_REAL,source,tag,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_RECV_REAL_ARRAY2D")
-    return
+     
   end subroutine COMMS_RECV_REAL_ARRAY2D
 
 
@@ -668,7 +668,7 @@ contains
        call MPI_REDUCE(send_buff,recv_buff,count,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD,status1,ierr)
     end if
     call trace_exit("COMMS_REDUCE_INT")
-    return
+     
   end subroutine COMMS_REDUCE_INT
 
   subroutine COMMS_REDUCE_REAL(send_buff,recv_buff,count,OP)
@@ -698,7 +698,7 @@ contains
        call MPI_REDUCE(send_buff,recv_buff,count,MPI_FLOAT,MPI_SUM,0,MPI_COMM_WORLD,status1,ierr)
     end if
     call trace_exit("COMMS_REDUCE_REAL")
-    return
+     
   end subroutine COMMS_REDUCE_REAL
 
   subroutine COMMS_REDUCE_DOUBLE(send_buff,recv_buff,count,OP)
@@ -733,7 +733,7 @@ contains
     end if
 
     call trace_exit("COMMS_REDUCE_DOUBLE")
-    return
+     
   end subroutine COMMS_REDUCE_DOUBLE
 
   ! ARRAY
@@ -769,7 +769,7 @@ contains
        call MPI_REDUCE(send_buff,recv_buff,count,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD,status1,ierr)
     end if
     call trace_exit("COMMS_REDUCE_INT_ARRAY")
-    return
+     
   end subroutine COMMS_REDUCE_INT_ARRAY
 
   subroutine COMMS_REDUCE_REAL_ARRAY(send_buff,recv_buff,count,OP)
@@ -800,7 +800,7 @@ contains
        call MPI_REDUCE(send_buff,recv_buff,count,MPI_FLOAT,MPI_SUM,0,MPI_COMM_WORLD,status1,ierr)
     end if
     call trace_exit("COMMS_REDUCE_REAL_ARRAY")
-    return
+     
   end subroutine COMMS_REDUCE_REAL_ARRAY
 
   subroutine COMMS_REDUCE_DOUBLE_ARRAY(send_buff,recv_buff,count,OP)
@@ -833,7 +833,7 @@ contains
     end if
 !    print*, rank,"after"
     call trace_exit("COMMS_REDUCE_DOUBLE_ARRAY")
-    return
+     
   end subroutine COMMS_REDUCE_DOUBLE_ARRAY
 
 
@@ -872,7 +872,7 @@ contains
        call MPI_REDUCE(send_buff,recv_buff,count,MPI_INT,MPI_LAND,0,MPI_COMM_WORLD,status1,ierr)
     end if
     call trace_exit("COMMS_REDUCE_LOG")
-    return
+     
   end subroutine COMMS_REDUCE_LOG
 
 
@@ -897,7 +897,7 @@ contains
     call trace_entry("COMMS_BCAST_INT")
     call MPI_BCAST(start_buff, count,MPI_INT,0,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_BCAST_INT")
-    return
+     
   end subroutine COMMS_BCAST_INT
 
   subroutine COMMS_BCAST_REAL(start_buff,count)
@@ -918,7 +918,7 @@ contains
     call trace_entry("COMMS_BCAST_REAL")
     call MPI_BCAST(start_buff, count,MPI_FLOAT,0,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_BCAST_REAL")
-    return
+     
   end subroutine COMMS_BCAST_REAL
 
   subroutine COMMS_BCAST_DOUBLE(start_buff,count)
@@ -940,7 +940,7 @@ contains
     call trace_entry("COMMS_BCAST_DOUBLE")
     call MPI_BCAST(start_buff, count,MPI_DOUBLE,0,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_BCAST_DOUBLE")
-    return
+     
   end subroutine COMMS_BCAST_DOUBLE
   !ARRAY
   subroutine COMMS_BCAST_INT_ARRAY(start_buff,count)
@@ -961,7 +961,7 @@ contains
     call trace_entry("COMMS_BCAST_INT_ARRAY")
     call MPI_BCAST(start_buff, count,MPI_INT,0,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_BCAST_INT_ARRAY")
-    return
+     
   end subroutine COMMS_BCAST_INT_ARRAY
 
   subroutine COMMS_BCAST_REAL_ARRAY(start_buff,count)
@@ -980,7 +980,7 @@ contains
     integer :: count
     real,dimension(1:count) :: start_buff
     call MPI_BCAST(start_buff, count,MPI_FLOAT,0,MPI_COMM_WORLD,status1,ierr)
-    return
+     
   end subroutine COMMS_BCAST_REAL_ARRAY
 
   subroutine COMMS_BCAST_DOUBLE_ARRAY(start_buff,count)
@@ -1001,7 +1001,7 @@ contains
     call trace_entry("COMMS_BCAST_DOUBLE_ARRAY")
     call MPI_BCAST(start_buff, count,MPI_DOUBLE,0,MPI_COMM_WORLD,status1,ierr)
     call trace_exit("COMMS_BCAST_DOUBLE_ARRAY")
-    return
+     
   end subroutine COMMS_BCAST_DOUBLE_ARRAY
 
 
@@ -1025,7 +1025,7 @@ contains
 !    call trace_entry("COMMS_WTIME")
     time = MPI_WTIME()
 !    call trace_exit("COMMS_WTIME")
-    return
+     
   end function COMMS_WTIME
 
 
@@ -1045,7 +1045,7 @@ contains
     else
        allocate(comms_scheme_array(0:nprocs-1,1:4))
     end if
-    print*,nprocs
+    comms_scheme_array=0
     if (nprocs.lt.N.and.nprocs.ne.1)then
        allocate(split(1:nprocs))
 
@@ -1106,7 +1106,7 @@ contains
 !!$    
 
     call trace_exit("comms_scheme")
-    return
+     
   end subroutine COMMS_SCHEME
 
 

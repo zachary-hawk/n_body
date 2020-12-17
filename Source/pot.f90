@@ -112,24 +112,26 @@ contains
        end do
     end do
     ! Now we have to reduce and bcast
-    do ni=1,struct%n_bodies
-       call COMMS_REDUCE_DOUBLE(sum(U_sum(ni,:,1)),dummy_pot%pot_array(ni,1),3,"MPI_SUM")
-       call COMMS_REDUCE_DOUBLE(sum(U_sum(ni,:,2)),dummy_pot%pot_array(ni,2),3,"MPI_SUM")
-       call COMMS_REDUCE_DOUBLE(sum(U_sum(ni,:,3)),dummy_pot%pot_array(ni,3),3,"MPI_SUM")
-       call COMMS_REDUCE_DOUBLE(sum(E_sum(ni,:)),struct%tot_energy,1,"MPI_SUM")
-       !call comms_reduce_double(sum(dir_sum(ni,:,1)),dummy_pot%pot_dir(ni,1),1,"MPI_SUM")
-       !call comms_reduce_double(sum(dir_sum(ni,:,2)),dummy_pot%pot_dir(ni,2),1,"MPI_SUM")
-       !call comms_reduce_double(sum(dir_sum(ni,:,3)),dummy_pot%pot_dir(ni,3),1,"MPI_SUM")
-    end do
+    if (nprocs.gt.1)then 
+       do ni=1,struct%n_bodies
+          call COMMS_REDUCE(sum(U_sum(ni,:,1)),dummy_pot%pot_array(ni,1),3,"MPI_SUM")
+          call COMMS_REDUCE(sum(U_sum(ni,:,2)),dummy_pot%pot_array(ni,2),3,"MPI_SUM")
+          call COMMS_REDUCE(sum(U_sum(ni,:,3)),dummy_pot%pot_array(ni,3),3,"MPI_SUM")
+          call COMMS_REDUCE(sum(E_sum(ni,:)),struct%tot_energy,1,"MPI_SUM")
+          !call comms_reduce_double(sum(dir_sum(ni,:,1)),dummy_pot%pot_dir(ni,1),1,"MPI_SUM")
+          !call comms_reduce_double(sum(dir_sum(ni,:,2)),dummy_pot%pot_dir(ni,2),1,"MPI_SUM")
+          !call comms_reduce_double(sum(dir_sum(ni,:,3)),dummy_pot%pot_dir(ni,3),1,"MPI_SUM")
+       end do
 
 
-    !do  ni=1,struct%n_bodies
-    !   dummy_pot%pot_dir(ni,:)=dummy_pot%pot_dir(ni,:)/sqrt(sum(dummy_pot%pot_dir(ni,:)**2))
-    !
-    !end do
+       !do  ni=1,struct%n_bodies
+       !   dummy_pot%pot_dir(ni,:)=dummy_pot%pot_dir(ni,:)/sqrt(sum(dummy_pot%pot_dir(ni,:)**2))
+       !
+       !end do
 
 
-    call comms_bcast(struct%tot_energy,1)
+       call comms_bcast(struct%tot_energy,1)
+    end if
     !call comms_bcast_double_array(dummy_pot%pot_array,size(dummy_pot%pot_array))
     !call comms_bcast_double_array(dummy_pot%pot_dir,size(dummy_pot%pot_dir))
 

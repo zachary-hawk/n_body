@@ -91,7 +91,7 @@ contains
 
     !print*,"entry start"
     call CPU_TIME(time)
-
+    print*,"IN: ",trim(sub_name)
     ! check for comms
     if (index(new_sub_name,"comms").gt.0) comms_start_time=comms_start_time+time
     if (index(new_sub_name,"io_").gt.0) io_start_time=io_start_time+time
@@ -148,6 +148,7 @@ contains
     !print*,"exit start"
     new_sub_name=trace_string_to_lower(sub_name)
     call CPU_TIME(time)
+    print*,"OUT: ",trim(sub_name)
     ! check for comms
     if (index(sub_name,"COMMS").gt.0) comms_end_time=comms_end_time+time
     if (index(sub_name,"io_").gt.0) io_end_time=io_end_time+time
@@ -238,8 +239,7 @@ contains
     comms_time=abs(comms_end_time-comms_start_time)
     io_time=abs(io_end_time-io_start_time)
 
-    print*,entry_array
-    print*,exit_array
+
 
     !if (allocated(temp_real_array)) deallocate(temp_real_array)
     !if (allocated(temp_char_array)) deallocate(temp_char_array)
