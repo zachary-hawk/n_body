@@ -21,7 +21,7 @@ program n_body
   ! After the io_initialise call, the number of objects has been settled we can now work out the parallelism 
 
   call comms_scheme(current_structure%n_bodies)
-  print*,comms_scheme_array
+  print*,comms_scheme_array 
   if (on_root_node)then
      call io_write_params()
      if (current_params%dry_run) call io_dryrun()

@@ -39,7 +39,7 @@ contains
     do while (struct%sys_time.lt.current_params%calc_len)
        call pot_calculate(G_pot,struct)
        call diff_time_step(G_pot)
-
+       print*,G_pot%pot_array
        ! Select a method based on whats in the params file
 
        do ni  = comms_scheme_array(rank,1),comms_scheme_array(rank,2)
@@ -52,7 +52,7 @@ contains
           select case(current_params%diff_method)
           case('euler')
 
-
+             
 
              ! update the position
              do i=1,3
@@ -92,19 +92,24 @@ contains
                 call comms_recv(struct%init_velocity(ni,:),3,i,ni+struct%n_bodies)
              end do
           end do
-          ! now bcast
-          do ni=1,struct%n_bodies
-             call comms_bcast(struct%positions(ni,:),3)
-             call comms_bcast(struct%init_velocity(ni,:),3)
-          end do
        end if
+       ! now bcast
+
+       do ni=1,struct%n_bodies
+          do i=1,3
+             call comms_bcast(struct%positions(ni,i),1)
+             call comms_bcast(struct%init_velocity(ni,i),1)
+          end do
+       end do
+
 
        ! Advance  the system clock
        struct%sys_time=struct%sys_time+current_params%time_step
-       if (on_root_node)call diff_progress(struct,current_params%time_step)
-       ! If we are writing the file, do it here
-       if (current_params%write_config)call io_write_config(struct)
-
+       if (on_root_node)then
+          call diff_progress(struct,current_params%time_step)
+          ! If we are writing the file, do it here
+          if (current_params%write_config)call io_write_config(struct)
+       end if
     end do
 
     write(stdout,*)"+",repeat("=",94),"+ <--DIFF"

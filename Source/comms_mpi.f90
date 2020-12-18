@@ -1045,7 +1045,7 @@ contains
     else
        allocate(comms_scheme_array(0:nprocs-1,1:4))
     end if
-    comms_scheme_array=0
+    !comms_scheme_array=0
     if (nprocs.lt.N.and.nprocs.ne.1)then
        allocate(split(1:nprocs))
 
