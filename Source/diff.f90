@@ -36,16 +36,21 @@ contains
 
     open(newunit=u,file="earth.dat",form="FORMATTED",status="unknown",access="stream")
     open(newunit=k,file="energy.dat",form="FORMATTED",status="unknown",access="stream")
+    t=0
     do while (struct%sys_time.lt.current_params%calc_len)
+       t=t+1
+      
+       !if (t.eq.3)exit
+
        call pot_calculate(G_pot,struct)
        call diff_time_step(G_pot)
-       print*,G_pot%pot_array
-       ! Select a method based on whats in the params file
+
+
+       !print*, rank,t,sum((current_structure%positions(1,:)-current_structure%positions(2,:))**2),sqrt(sum(G_pot%pot_array(1,:)**2))
+
+       !       Select a method based on whats in the params file
 
        do ni  = comms_scheme_array(rank,1),comms_scheme_array(rank,2)
-
-
-
 
 
 
@@ -75,38 +80,13 @@ contains
 
 
 
-          ! send and receive
-          if (.not.on_root_node)then
-             !print*,"Positions",rank,ni
-             call comms_send(struct%positions(ni,:),size(struct%positions(ni,:)),0,ni)
-             !print*,"Velocity",rank,ni
-             call comms_send(struct%init_velocity(ni,:),size(struct%positions(ni,:)),0,ni+struct%n_bodies)
-          end if
        end  do
-
-       ! Now we do the recv
-       if (on_root_node.and.nprocs.gt.1)then 
-          do i = 1,nprocs-1
-             do ni=comms_scheme_array(i,1),comms_scheme_array(i,2)
-                call comms_recv(struct%positions(ni,:),3,i,ni)
-                call comms_recv(struct%init_velocity(ni,:),3,i,ni+struct%n_bodies)
-             end do
-          end do
-       end if
-       ! now bcast
-
-       do ni=1,struct%n_bodies
-          do i=1,3
-             call comms_bcast(struct%positions(ni,i),1)
-             call comms_bcast(struct%init_velocity(ni,i),1)
-          end do
-       end do
 
 
        ! Advance  the system clock
        struct%sys_time=struct%sys_time+current_params%time_step
+       call diff_progress(struct,current_params%time_step)
        if (on_root_node)then
-          call diff_progress(struct,current_params%time_step)
           ! If we are writing the file, do it here
           if (current_params%write_config)call io_write_config(struct)
        end if
@@ -130,7 +110,7 @@ contains
     if (struct%sys_time-time_step.le.exact.and.struct%sys_time.gt.exact)then
        ctime=comms_wtime()
        call cpu_time(ctime)
-       write(stdout,'(" |",T10,f5.1,1x,"%",T70,f14.6,T97,"| <--DIFF")')perc_prog,ctime-global_start
+       if (on_root_node)write(stdout,'(" |",T10,f5.1,1x,"%",T70,f14.6,T97,"| <--DIFF")')perc_prog,ctime-global_start
        perc_prog=perc_prog+10
        call io_flush(stdout)
     end if

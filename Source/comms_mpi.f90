@@ -23,7 +23,7 @@ module COMMS
   
   character(3)                         :: comms_arch="MPI"
   integer,public,save,dimension(:,:),allocatable :: comms_scheme_array
-
+  logical,public :: u_scheme=.false.
 
 
 
@@ -96,7 +96,7 @@ contains
     !==============================================================================!
     call trace_entry("COMMS_BARRIER")
 
-    call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+    call MPI_BARRIER(MPI_COMM_WORLD,1)
     call trace_exit("COMMS_BARRIER")
      
   end subroutine COMMS_BARRIER
@@ -1046,6 +1046,9 @@ contains
        allocate(comms_scheme_array(0:nprocs-1,1:4))
     end if
     !comms_scheme_array=0
+
+    if (nprocs.gt.N)u_scheme=.true.
+    
     if (nprocs.lt.N.and.nprocs.ne.1)then
        allocate(split(1:nprocs))
 

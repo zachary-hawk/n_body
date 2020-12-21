@@ -21,20 +21,17 @@ program n_body
   ! After the io_initialise call, the number of objects has been settled we can now work out the parallelism 
 
   call comms_scheme(current_structure%n_bodies)
-  print*,comms_scheme_array 
+
   if (on_root_node)then
      call io_write_params()
      if (current_params%dry_run) call io_dryrun()
      !print*,current_structure%init_velocity
   end if
 
-  print*,"before diff solver"
 
 
   ! do a test  call to diff
   call diff_solver(current_structure)
-  print*,"After diff"
-  
   
 
   
@@ -47,10 +44,7 @@ program n_body
 
 
   call trace_exit("n_body")
-  print*,"trace_finalise"
   call trace_finalise(current_params%debuging,rank)
-  print*,"comms_finalise"
   call comms_finalise()
-  print*,"Fin"
 
 end program n_body
